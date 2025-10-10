@@ -1,25 +1,27 @@
-import { Stack, Link } from 'expo-router';
+import { useEffect } from 'react';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { router } from 'expo-router';
+import { supabase } from '@/utils/supabase';
 
-import { View } from 'react-native';
+export default function Index() {
+  useEffect(() => {
+    checkAuth();
+  }, []);
 
-import { Button } from '@/components/Button';
-import { Container } from '@/components/Container';
-import { ScreenContent } from '@/components/ScreenContent';
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+      router.replace('/(tabs)/dashboard');
+    } else {
+      router.replace('/login');
+    }
+  };
 
-export default function Home() {
   return (
-    <View className={styles.container}>
-      <Stack.Screen options={{ title: 'Home' }} />
-      <Container>
-        <ScreenContent path="app/index.tsx" title="Home"></ScreenContent>
-        <Link href={{ pathname: '/details', params: { name: 'Dan' } }} asChild>
-          <Button title="Show Details" />
-        </Link>
-      </Container>
+    <View className="flex-1 justify-center items-center bg-indigo-500">
+      <ActivityIndicator size="large" color="#fff" />
+      <Text className="text-white text-xl font-bold mt-4">Loading QAir...</Text>
     </View>
   );
 }
-
-const styles = {
-  container: 'flex flex-1 bg-white',
-};
