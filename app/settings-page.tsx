@@ -114,9 +114,19 @@ export default function SettingsPage() {
         }, openRouterApiKey);
 
         Alert.alert('Success', 'Health report generated and ready to share!');
-      } catch (error) {
+      } catch (error: any) {
         console.error('PDF generation error:', error);
-        Alert.alert('Error', 'Failed to generate PDF report. Please try again.');
+        
+        // Check if it's the specific Expo Go limitation error
+        if (error?.message?.includes('development build')) {
+          // Error already shown by pdfGenerator, just return
+          return;
+        }
+        
+        Alert.alert(
+          'Error', 
+          'Failed to generate PDF report. Please try again or use a development build for full PDF support.'
+        );
       }
     } catch (error) {
       console.error('Export error:', error);

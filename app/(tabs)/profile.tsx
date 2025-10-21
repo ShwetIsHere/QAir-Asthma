@@ -14,6 +14,7 @@ import { BarChart } from 'react-native-chart-kit';
 import { Calendar } from 'react-native-calendars';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/utils/supabase';
+import BluetoothManager from '@/components/BluetoothManager';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -420,6 +421,20 @@ export default function ProfilePage() {
             </View>
           </View>
         </LinearGradient>
+
+        {/* Bluetooth IoT Device Connection */}
+        <View className="mx-5 mt-5">
+          <BluetoothManager
+            onDeviceConnected={(device) => {
+              console.log('Device connected:', device);
+              // You can handle device connection here (e.g., start receiving data)
+            }}
+            onDeviceDisconnected={() => {
+              console.log('Device disconnected');
+              // Handle disconnection here
+            }}
+          />
+        </View>
 
         {/* Weekly Triggers Chart */}
         <View className="bg-white mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>

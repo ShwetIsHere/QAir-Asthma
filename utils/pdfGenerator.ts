@@ -1,7 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { Paths, File } from 'expo-file-system';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 type TriggerData = {
   id: string;
@@ -255,27 +254,8 @@ export const generateHealthReport = async (reportData: ReportData, openRouterApi
     // Generate AI insights
     const aiInsights = await generateAIInsights(reportData, openRouterApiKey);
     
-    // Load logo as base64 - using asset from project
-    let logoBase64 = '';
-    try {
-      // Use the logo from assets or provide base64 directly
-      const logoPath = 'file:///f:/Asthma%20Native/logo.png';
-      const logoFile = new File(logoPath);
-      if (logoFile.exists) {
-        const buffer = await logoFile.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        logoBase64 = btoa(binary);
-      } else {
-        // Fallback: Use QAir text as placeholder
-        console.log('Logo file not found at:', logoPath);
-      }
-    } catch (error) {
-      console.log('Logo loading error:', error);
-    }
+    // Use QAir branding without external logo
+    const logoBase64 = '';
     
     const html = `
     <!DOCTYPE html>
@@ -613,9 +593,6 @@ export const generateHealthReport = async (reportData: ReportData, openRouterApi
     </html>
     `;
 
-    // Generate PDF
-    const { uri } = await Print.printToFileAsync({ html });
-    
     // Create custom filename: username-dd-mm-yy-Report.pdf
     const date = new Date();
     const day = String(date.getDate()).padStart(2, '0');
@@ -624,36 +601,41 @@ export const generateHealthReport = async (reportData: ReportData, openRouterApi
     const sanitizedUsername = reportData.userName.replace(/[^a-zA-Z0-9]/g, '_');
     const customFilename = `${sanitizedUsername}-${day}-${month}-${year}-Report.pdf`;
     
-    // Copy to cache with custom name
-    const customUri = `${Paths.cache.uri}${customFilename}`;
-    const sourceFile = new File(uri);
-    const destFile = new File(customUri);
+    // Generate PDF with custom filename
+    const { uri } = await Print.printToFileAsync({ 
+      html,
+      base64: false,
+    });
     
-    // Delete if exists, then create new file
-    if (destFile.exists) {
-      await destFile.delete();
-    }
+    console.log('PDF generated at:', uri);
     
-    // Copy file content
-    const pdfBuffer = await sourceFile.arrayBuffer();
-    await destFile.create();
-    const writer = destFile.writableStream().getWriter();
-    await writer.write(new Uint8Array(pdfBuffer));
-    await writer.close();
-    
-    // Share the PDF with custom filename
+    // Share the PDF
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
-      await Sharing.shareAsync(customUri, {
+      await Sharing.shareAsync(uri, {
         mimeType: 'application/pdf',
         dialogTitle: 'Share Your Health Report',
         UTI: 'com.adobe.pdf',
       });
+    } else {
+      Alert.alert('Success', `PDF saved to: ${uri}`);
     }
     
-    return customUri;
-  } catch (error) {
+    return uri;
+  } catch (error: any) {
     console.error('PDF generation error:', error);
+    
+    // Provide more specific error messages
+    if (error?.message?.includes('rejected') || error?.message?.includes('writing')) {
+      // This is likely an Expo Go limitation
+      Alert.alert(
+        'PDF Generation Not Available',
+        'PDF generation requires a development build. In Expo Go, this feature has limited support.\n\nTo use this feature:\n1. Build a development build: npx expo run:android\n2. Or use EAS Build for production',
+        [{ text: 'OK' }]
+      );
+      throw new Error('PDF generation requires development build');
+    }
+    
     throw error;
   }
 };

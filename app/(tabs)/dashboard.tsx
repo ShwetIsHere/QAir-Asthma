@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { Stack, router } from 'expo-router';
 import MapView, { Marker, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -10,6 +10,7 @@ import { supabase } from '@/utils/supabase';
 import { AQICard } from '@/components/AQICard';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { fetchAirQuality } from '@/utils/airQuality';
+import BluetoothManager from '@/components/BluetoothManager';
 
 type InhalerTrigger = {
   id: string;
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const [selectedTrigger, setSelectedTrigger] = useState<InhalerTrigger | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
+  const [bluetoothModalVisible, setBluetoothModalVisible] = useState(false);
   const mapRef = useRef<MapView>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
 
@@ -210,23 +212,7 @@ export default function Dashboard() {
   };
 
   const handleInhalerConnect = () => {
-    Alert.alert(
-      'Connect Inhaler',
-      'Would you like to connect your smart inhaler via Bluetooth?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Connect',
-          onPress: () => {
-            // TODO: Implement Bluetooth connection
-            Alert.alert('Coming Soon', 'Bluetooth inhaler connection will be available soon!');
-          },
-        },
-      ]
-    );
+    setBluetoothModalVisible(true);
   };
 
   const centerOnLocation = () => {
@@ -370,7 +356,75 @@ export default function Dashboard() {
             </Text>
           </View>
         </BottomSheet>
+
+        {/* Bluetooth Device Connection Modal */}
+        <Modal
+          visible={bluetoothModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setBluetoothModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Connect IoT Device</Text>
+                <TouchableOpacity
+                  onPress={() => setBluetoothModalVisible(false)}
+                  style={styles.closeButton}>
+                  <Ionicons name="close-circle" size={32} color="#6366F1" />
+                </TouchableOpacity>
+              </View>
+              
+              <BluetoothManager
+                onDeviceConnected={(device) => {
+                  console.log('Device connected:', device);
+                  setBluetoothModalVisible(false);
+                  Alert.alert(
+                    'Connected!',
+                    `Successfully connected to ${device.name}. Your device will now sync data automatically.`,
+                    [{ text: 'OK' }]
+                  );
+                }}
+                onDeviceDisconnected={() => {
+                  console.log('Device disconnected');
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
       </View>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 24,
+    width: '100%',
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: 4,
+  },
+});
