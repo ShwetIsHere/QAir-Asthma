@@ -54,13 +54,26 @@ export default function TriggerDetails() {
   useEffect(() => {
     loadWeatherData();
     loadPlaceName();
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      setWeatherData(null);
+      setAiAnalysis('');
+      setHourlyForecast([]);
+    };
   }, []);
 
   useEffect(() => {
     // Load AI analysis after weather data is available
-    if (weatherData) {
+    let isMounted = true;
+    
+    if (weatherData && isMounted) {
       loadAIAnalysis();
     }
+    
+    return () => {
+      isMounted = false;
+    };
   }, [weatherData]);
 
   const loadPlaceName = async () => {
@@ -105,7 +118,10 @@ export default function TriggerDetails() {
     if (!weatherData) return;
     
     setAnalysisLoading(true);
+    setAiAnalysis(''); // Clear previous analysis
+    
     try {
+      console.log('Loading AI analysis for location...');
       const analysis = await analyzeLocationSuitability({
         aqi: weatherData.aqi,
         category: weatherData.category,
@@ -118,11 +134,31 @@ export default function TriggerDetails() {
         weatherDescription: weatherData.weatherDescription,
         placeName: placeName,
       });
+      
+      console.log('AI analysis loaded successfully');
       setAiAnalysis(analysis);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading AI analysis:', error);
-      // Don't show error, just leave analysis empty
-      setAiAnalysis('');
+      
+      // Show detailed error to user
+      let errorMessage = 'AI Analysis Unavailable';
+      let errorDetails = error?.message || 'Failed to get AI health assessment.';
+      
+      // Add helpful tips based on error type
+      if (errorDetails.includes('API key')) {
+        errorDetails += '\n\nPlease check that EXPO_PUBLIC_OPENROUTER_API_KEY is set in your environment variables.';
+      } else if (errorDetails.includes('internet') || errorDetails.includes('Network')) {
+        errorDetails += '\n\nPlease check your internet connection and try again.';
+      } else if (errorDetails.includes('credits') || errorDetails.includes('402')) {
+        errorDetails += '\n\nThe free tier may have usage limits. Please try again later.';
+      }
+      
+      Alert.alert(
+        errorMessage,
+        errorDetails,
+        [{ text: 'OK' }]
+      );
+      setAiAnalysis(''); // Don't show any preloaded text
     } finally {
       setAnalysisLoading(false);
     }
@@ -307,40 +343,28 @@ export default function TriggerDetails() {
             </View>
           </View>
 
-          {/* AI-Powered Location Analysis */}
+          {/* AI-Powered Location Analysis - ONLY REAL AI, NO PRELOADED TEXT */}
           {analysisLoading ? (
             <View className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 border border-purple-200">
               <View className="flex-row items-center mb-2">
                 <ActivityIndicator size="small" color="#8B5CF6" />
-                <Text className="text-purple-900 font-semibold ml-2">AI Analysis Loading...</Text>
+                <Text className="text-purple-900 font-semibold ml-2 text-sm">Analyzing with AI...</Text>
               </View>
-              <Text className="text-purple-800 text-sm">
-                Analyzing location conditions for asthma patients...
+              <Text className="text-purple-800 text-xs">
+                Fetching real-time health assessment from OpenRouter AI based on current weather data...
               </Text>
             </View>
           ) : aiAnalysis ? (
-            <View className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 border border-purple-200 mb-4">
+            <View className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 border border-purple-200">
               <View className="flex-row items-center mb-2">
-                <Ionicons name="sparkles" size={20} color="#8B5CF6" />
-                <Text className="text-purple-900 font-semibold ml-2">AI Professional Assessment</Text>
+                <Ionicons name="sparkles" size={18} color="#8B5CF6" />
+                <Text className="text-purple-900 font-semibold ml-2 text-sm">AI Health Assessment</Text>
               </View>
-              <Text className="text-purple-900 text-sm leading-6">
+              <Text className="text-purple-900 text-sm leading-5">
                 {aiAnalysis}
               </Text>
             </View>
           ) : null}
-
-          <View className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
-            <View className="flex-row items-center mb-2">
-              <Ionicons name="information-circle" size={20} color="#3B82F6" />
-              <Text className="text-blue-900 font-semibold ml-2">Health Recommendation</Text>
-            </View>
-            <Text className="text-blue-800 text-sm leading-5">
-              {weatherData && weatherData.aqi > 100
-                ? 'Air quality is concerning. Consider staying indoors and using your inhaler if needed. Avoid outdoor activities.'
-                : 'Air quality is acceptable. You can enjoy outdoor activities, but be mindful of any symptoms.'}
-            </Text>
-          </View>
         </View>
 
         {/* Additional Weather Info */}

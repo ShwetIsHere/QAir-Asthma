@@ -26,7 +26,7 @@
 - **PM2.5 and PM10** pollution levels
 - **Temperature and humidity** tracking
 - **Beautiful data visualization** with color-coded indicators
-- **Health recommendations** based on air quality
+- **🤖 AI-Powered Health Recommendations** - Get personalized health advice based on current weather conditions using Google Gemini 2.0 Flash
 - **Historical data** for all trigger locations
 
 ### ⚙️ Settings & Profile
@@ -78,9 +78,12 @@
    ```env
    EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
    EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
-   EXPO_PUBLIC_OPENWEATHER_API_KEY=your_openweather_api_key
+   EXPO_PUBLIC_OPENROUTER_API_KEY=your_openrouter_api_key
    ```
+   
+   **Important**: For AI health analysis to work, you MUST add your OpenRouter API key!
+   - Get a FREE API key from: https://openrouter.ai/keys
+   - See `OPENROUTER_SETUP.md` for detailed instructions
 
 4. **Setup Supabase Database**
    

@@ -61,6 +61,22 @@ export default function BluetoothManager({
   const [bluetoothEnabled, setBluetoothEnabled] = useState(false);
   const [checkingBluetooth, setCheckingBluetooth] = useState(false);
 
+  // Debug: Log when available devices change
+  useEffect(() => {
+    console.log('Available devices updated:', availableDevices.length, availableDevices.map(d => d.name));
+  }, [availableDevices]);
+
+  // Debug: Log UI state
+  useEffect(() => {
+    console.log('UI State:', {
+      bluetoothEnabled,
+      checkingBluetooth,
+      isScanning,
+      isModalVisible,
+      deviceCount: availableDevices.length
+    });
+  }, [bluetoothEnabled, checkingBluetooth, isScanning, isModalVisible, availableDevices.length]);
+
   // Monitor Bluetooth state changes in real-time
   useEffect(() => {
     let subscription: any = null;
@@ -261,21 +277,30 @@ export default function BluetoothManager({
             return;
           }
 
-          if (device && device.name) {
-            console.log('Found device:', device.name, device.id);
+          if (device) {
+            // Use device name or ID as fallback
+            const deviceName = device.name || device.localName || `Unknown Device (${device.id.slice(0, 8)}...)`;
+            console.log('Found device:', deviceName, device.id);
             
             const newDevice: BluetoothDevice = {
               id: device.id,
-              name: device.name,
+              name: deviceName,
               rssi: device.rssi || undefined,
               isConnected: false,
             };
 
             setAvailableDevices(prevDevices => {
-              // Avoid duplicates
-              if (prevDevices.find(d => d.id === newDevice.id)) {
-                return prevDevices;
+              // Check if device already exists
+              const existingIndex = prevDevices.findIndex(d => d.id === newDevice.id);
+              
+              if (existingIndex !== -1) {
+                // Update existing device (in case RSSI changed)
+                const updated = [...prevDevices];
+                updated[existingIndex] = newDevice;
+                return updated;
               }
+              
+              // Add new device
               return [...prevDevices, newDevice];
             });
           }
@@ -574,12 +599,12 @@ export default function BluetoothManager({
               colors={['#6366F1', '#8B5CF6']}
               style={styles.modalHeader}
             >
-              <Text style={styles.modalTitle}>Available Bluetooth Devices</Text>
+              <Text style={styles.modalTitle}>Nearby Devices</Text>
               <TouchableOpacity
                 onPress={() => setIsModalVisible(false)}
                 style={styles.closeButton}
               >
-                <Ionicons name="close" size={28} color="white" />
+                <Ionicons name="close" size={24} color="white" />
               </TouchableOpacity>
             </LinearGradient>
 
@@ -587,29 +612,23 @@ export default function BluetoothManager({
             {isScanning && (
               <View style={styles.scanningContainer}>
                 <ActivityIndicator size="small" color="#6366F1" />
-                <Text style={styles.scanningText}>Scanning for devices...</Text>
+                <Text style={styles.scanningText}>Scanning...</Text>
               </View>
             )}
 
             {/* Bluetooth Checking Indicator */}
             {checkingBluetooth && (
               <View style={styles.bluetoothCheckContainer}>
-                <Ionicons name="bluetooth" size={48} color="#6366F1" />
-                <Text style={styles.bluetoothCheckText}>Checking Bluetooth status...</Text>
-                <Text style={styles.bluetoothCheckSubtext}>
-                  Please wait while we verify your Bluetooth connection
-                </Text>
+                <Ionicons name="bluetooth" size={40} color="#6366F1" />
+                <Text style={styles.bluetoothCheckText}>Checking Bluetooth...</Text>
               </View>
             )}
 
             {/* Bluetooth Disabled Warning */}
             {!bluetoothEnabled && !checkingBluetooth && (
               <View style={styles.bluetoothDisabledContainer}>
-                <Ionicons name="warning" size={48} color="#F59E0B" />
+                <Ionicons name="warning" size={40} color="#F59E0B" />
                 <Text style={styles.bluetoothDisabledText}>Bluetooth is Disabled</Text>
-                <Text style={styles.bluetoothDisabledSubtext}>
-                  Please enable Bluetooth to scan for nearby IoT devices
-                </Text>
                 <TouchableOpacity
                   style={styles.enableBluetoothButton}
                   onPress={async () => {
@@ -621,42 +640,47 @@ export default function BluetoothManager({
                     }
                   }}
                 >
-                  <Ionicons name="power" size={20} color="white" />
+                  <Ionicons name="power" size={18} color="white" />
                   <Text style={styles.enableBluetoothButtonText}>Enable Bluetooth</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {/* Device List */}
-            {!checkingBluetooth && bluetoothEnabled && availableDevices.length > 0 ? (
-              <FlatList
-                data={availableDevices}
-                renderItem={renderDeviceItem}
-                keyExtractor={(item) => item.id}
-                style={styles.deviceList}
-                contentContainerStyle={styles.deviceListContent}
-              />
-            ) : (
-              !isScanning && (
-                <View style={styles.emptyState}>
-                  <Ionicons name="bluetooth-outline" size={64} color="#D1D5DB" />
-                  <Text style={styles.emptyText}>No devices found</Text>
-                  <Text style={styles.emptySubtext}>
-                    Make sure your IoT device is powered on and in pairing mode
-                  </Text>
-                </View>
-              )
+            {bluetoothEnabled && !checkingBluetooth && (
+              <>
+                {availableDevices.length > 0 ? (
+                  <FlatList
+                    data={availableDevices}
+                    renderItem={renderDeviceItem}
+                    keyExtractor={(item) => item.id}
+                    style={styles.deviceList}
+                    contentContainerStyle={styles.deviceListContent}
+                    showsVerticalScrollIndicator={true}
+                  />
+                ) : !isScanning ? (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="bluetooth-outline" size={48} color="#D1D5DB" />
+                    <Text style={styles.emptyText}>No devices found</Text>
+                    <Text style={styles.emptySubtext}>
+                      Turn on your device's Bluetooth
+                    </Text>
+                  </View>
+                ) : null}
+              </>
             )}
 
             {/* Rescan Button */}
-            <TouchableOpacity
-              style={styles.rescanButton}
-              onPress={scanForDevices}
-              disabled={isScanning}
-            >
-              <Ionicons name="refresh" size={20} color="#6366F1" />
-              <Text style={styles.rescanButtonText}>Rescan</Text>
-            </TouchableOpacity>
+            {bluetoothEnabled && !checkingBluetooth && (
+              <TouchableOpacity
+                style={styles.rescanButton}
+                onPress={scanForDevices}
+                disabled={isScanning}
+              >
+                <Ionicons name="refresh" size={18} color="#6366F1" />
+                <Text style={styles.rescanButtonText}>Rescan</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -753,21 +777,22 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '80%',
-    paddingBottom: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '75%',
+    paddingBottom: 10,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderTopLeftRadius: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 20,
     borderTopRightRadius: 24,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: 'white',
   },
@@ -778,54 +803,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     backgroundColor: '#EEF2FF',
-    marginHorizontal: 20,
+    marginHorizontal: 15,
     marginTop: 10,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   scanningText: {
-    marginLeft: 10,
-    fontSize: 14,
+    marginLeft: 8,
+    fontSize: 13,
     color: '#6366F1',
     fontWeight: '600',
   },
   deviceList: {
-    flex: 1,
+    flexGrow: 1,
+    width: '100%',
   },
   deviceListContent: {
-    padding: 20,
+    paddingHorizontal: 15,
+    paddingTop: 15,
+    paddingBottom: 10,
   },
   deviceItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   deviceIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   deviceInfo: {
     flex: 1,
   },
   deviceName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   deviceId: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9CA3AF',
   },
   signalContainer: {
@@ -843,19 +873,19 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   emptyState: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    paddingVertical: 50,
+    paddingHorizontal: 30,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#6B7280',
-    marginTop: 16,
+    marginTop: 12,
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#9CA3AF',
     textAlign: 'center',
     marginTop: 8,
@@ -864,28 +894,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
-    marginHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginHorizontal: 15,
     marginTop: 10,
-    borderRadius: 12,
+    marginBottom: 10,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: '#6366F1',
     backgroundColor: 'white',
-    gap: 8,
+    gap: 6,
   },
   rescanButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#6366F1',
   },
   bluetoothCheckContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    paddingVertical: 60,
+    paddingHorizontal: 30,
   },
   bluetoothCheckText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#6366F1',
     marginTop: 16,
@@ -897,30 +929,30 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bluetoothDisabledContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    paddingVertical: 60,
+    paddingHorizontal: 30,
   },
   bluetoothDisabledText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#F59E0B',
-    marginTop: 16,
+    marginTop: 12,
   },
   bluetoothDisabledSubtext: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#9CA3AF',
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: 6,
+    marginBottom: 20,
   },
   enableBluetoothButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6366F1',
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
     gap: 8,

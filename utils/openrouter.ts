@@ -3,6 +3,17 @@ import axios from 'axios';
 const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
 const BASE_URL = 'https://openrouter.ai/api/v1';
 
+// Simple in-memory cache for AI responses (10 minute TTL to reduce API calls)
+const responseCache = new Map<string, { data: string; timestamp: number }>();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Generate cache key from weather data
+ */
+const getCacheKey = (weatherData: any): string => {
+  return `${weatherData.aqi}-${weatherData.temperature}-${weatherData.humidity}-${weatherData.pm25}`;
+};
+
 /**
  * OpenRouter API client for AI-powered features
  * Can be used for health recommendations, trigger analysis, etc.
@@ -20,39 +31,127 @@ export interface ChatCompletionResponse {
       content: string;
     };
   }>;
+  error?: {
+    message: string;
+    code: string;
+  };
 }
 
 /**
- * Send a chat completion request to OpenRouter
+ * Delay helper for retry logic
+ */
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Send a chat completion request to OpenRouter with retry logic
+ * Using FREE Google Gemini 2.0 Flash model
  */
 export const chatCompletion = async (
   messages: ChatMessage[],
-  model: string = 'openai/gpt-3.5-turbo'
+  model: string = 'google/gemini-2.0-flash-exp:free',
+  retries: number = 2
 ): Promise<string> => {
-  try {
-    if (!OPENROUTER_API_KEY) {
-      throw new Error('OpenRouter API key not configured');
-    }
-
-    const response = await axios.post<ChatCompletionResponse>(
-      `${BASE_URL}/chat/completions`,
-      {
-        model,
-        messages,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
+  let lastError: any;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (!OPENROUTER_API_KEY) {
+        console.error('OpenRouter API key is missing!');
+        throw new Error('OpenRouter API key not configured. Please add EXPO_PUBLIC_OPENROUTER_API_KEY to your .env file.');
       }
-    );
 
-    return response.data.choices[0]?.message?.content || '';
-  } catch (error) {
-    console.error('OpenRouter API error:', error);
-    throw error;
+      if (attempt > 0) {
+        const waitTime = Math.min(3000 * Math.pow(2, attempt - 1), 10000); // 3s, 6s, 10s max
+        console.log(`Retry attempt ${attempt}/${retries}, waiting ${waitTime}ms...`);
+        await delay(waitTime);
+      }
+
+      console.log('Making OpenRouter API request with Gemini 2.0 Flash (FREE)...');
+      console.log('API Key present:', OPENROUTER_API_KEY.substring(0, 10) + '...');
+      console.log('Request payload:', {
+        model,
+        messages: messages.map(m => ({ role: m.role, content: m.content.substring(0, 100) + '...' }))
+      });
+
+      const response = await axios.post<ChatCompletionResponse>(
+        `${BASE_URL}/chat/completions`,
+        {
+          model,
+          messages,
+          temperature: 0.7,
+          max_tokens: 300,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://github.com/ShwetIsHere/QAir-Asthma',
+            'X-Title': 'QAir Asthma App',
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000, // 30 second timeout
+        }
+      );
+
+      console.log('OpenRouter response received successfully!');
+      
+      // Check for error in response
+      if (response.data.error) {
+        throw new Error(`OpenRouter API Error: ${response.data.error.message}`);
+      }
+
+      const content = response.data.choices[0]?.message?.content;
+      
+      if (!content) {
+        throw new Error('No response content received from AI');
+      }
+
+      return content;
+    } catch (error: any) {
+      lastError = error;
+      console.error(`OpenRouter API error (attempt ${attempt + 1}/${retries + 1}):`, error?.message);
+      
+      // Don't retry on these errors
+      const status = error?.response?.status;
+      if (status === 401 || status === 402 || status === 400) {
+        break; // Don't retry authentication, payment, or bad request errors
+      }
+      
+      // Only retry on 429 (rate limit) or network errors
+      if (status === 429 || error?.code === 'ECONNABORTED' || error?.message?.includes('Network')) {
+        if (attempt < retries) {
+          continue; // Try again
+        }
+      } else {
+        break; // Don't retry other errors
+      }
+    }
   }
+  
+  // All retries failed, throw the last error
+  console.error('All retry attempts failed. Error details:', {
+    message: lastError?.message,
+    status: lastError?.response?.status,
+    statusText: lastError?.response?.statusText,
+    data: lastError?.response?.data,
+  });
+  
+  // Check for specific error codes and throw proper errors
+  if (lastError?.response?.status === 402) {
+    throw new Error('OpenRouter account has insufficient credits. The free tier may have limits.');
+  } else if (lastError?.response?.status === 401) {
+    throw new Error('OpenRouter API key is invalid or expired. Please check your API key.');
+  } else if (lastError?.response?.status === 429) {
+    throw new Error('Rate limit exceeded. The service is very busy right now. Please try again in a minute.');
+  } else if (lastError?.response?.status === 400) {
+    throw new Error('Invalid request format. Please try again.');
+  } else if (lastError?.code === 'ECONNABORTED' || lastError?.message?.includes('timeout')) {
+    throw new Error('Request timeout. Please check your internet connection and try again.');
+  } else if (lastError?.message?.includes('Network Error') || lastError?.message?.includes('ENOTFOUND')) {
+    throw new Error('Network error. Please check your internet connection.');
+  }
+  
+  // Re-throw with better error message
+  throw new Error(lastError?.response?.data?.error?.message || lastError?.message || 'Failed to get AI analysis. Please try again.');
 };
 
 /**
@@ -70,36 +169,72 @@ export const analyzeLocationSuitability = async (weatherData: {
   weatherDescription: string;
   placeName?: string;
 }): Promise<string> => {
+  console.log('Analyzing location suitability for:', weatherData.placeName);
+  
+  // Check cache first
+  const cacheKey = getCacheKey(weatherData);
+  const cached = responseCache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log('✅ Returning cached AI analysis (saves API calls!)');
+    return cached.data;
+  }
+  
   const messages: ChatMessage[] = [
     {
       role: 'system',
       content:
-        'You are a professional respiratory health consultant specializing in asthma management and environmental health. Analyze weather conditions and provide a brief, professional assessment of location suitability for asthma patients. Keep response under 3 sentences, be direct and actionable.',
+        'You are a professional respiratory health consultant specializing in asthma management. Analyze weather conditions and provide a brief assessment (2-3 sentences) for asthma patients. Be direct and actionable.',
     },
     {
       role: 'user',
-      content: `Analyze this location for an asthma patient:
-Location: ${weatherData.placeName || 'Current location'}
-Air Quality Index: ${weatherData.aqi} (${weatherData.category})
-PM2.5: ${weatherData.pm25} μg/m³
-PM10: ${weatherData.pm10} μg/m³
-Temperature: ${weatherData.temperature}°C
-Humidity: ${weatherData.humidity}%
-Wind Speed: ${weatherData.windSpeed} m/s
-UV Index: ${weatherData.uvIndex}
+      content: `Analyze weather conditions for an asthma patient at ${weatherData.placeName || 'this location'}:
+
+AQI: ${weatherData.aqi} (${weatherData.category})
+PM2.5: ${weatherData.pm25} μg/m³, PM10: ${weatherData.pm10} μg/m³
+Temperature: ${weatherData.temperature}°C, Humidity: ${weatherData.humidity}%
+Wind: ${weatherData.windSpeed} m/s, UV Index: ${weatherData.uvIndex}
 Weather: ${weatherData.weatherDescription}
 
-Is this location suitable for outdoor activities? Provide professional assessment.`,
+Is this location suitable for outdoor activities? Give brief professional assessment.`,
     },
   ];
 
   try {
-    const response = await chatCompletion(messages, 'openai/gpt-3.5-turbo');
-    return response;
-  } catch (error) {
-    // If API fails, return empty string - we'll handle it in UI
+    console.log('Sending request to OpenRouter AI...');
+    const response = await chatCompletion(messages, 'google/gemini-2.0-flash-exp:free');
+    
+    if (!response || response.trim().length === 0) {
+      throw new Error('Empty response received from AI');
+    }
+    
+    console.log('AI analysis received successfully');
+    
+    // Cache the response
+    responseCache.set(cacheKey, {
+      data: response.trim(),
+      timestamp: Date.now(),
+    });
+    
+    // Clean old cache entries (keep max 20 entries)
+    if (responseCache.size > 20) {
+      const firstKey = responseCache.keys().next().value;
+      if (firstKey) {
+        responseCache.delete(firstKey);
+      }
+    }
+    
+    return response.trim();
+  } catch (error: any) {
     console.error('Failed to get AI analysis:', error);
-    throw new Error('AI analysis unavailable');
+    
+    // Pass through the error message from chatCompletion
+    if (error?.message) {
+      throw error;
+    }
+    
+    // Fallback error
+    throw new Error('Unable to get AI health analysis at this time. Please try again later.');
   }
 };
 
@@ -124,9 +259,15 @@ export const getHealthRecommendations = async (
   ];
 
   try {
-    return await chatCompletion(messages);
+    const response = await chatCompletion(messages);
+    
+    if (!response) {
+      throw new Error('No response received from AI');
+    }
+    
+    return response;
   } catch (error) {
-    return getFallbackRecommendations(aqi);
+    throw new Error('Failed to get health recommendations. Please check your internet connection.');
   }
 };
 
@@ -153,25 +294,14 @@ export const analyzeTriggerPatterns = async (
   ];
 
   try {
-    return await chatCompletion(messages);
+    const response = await chatCompletion(messages);
+    
+    if (!response) {
+      throw new Error('No response received from AI');
+    }
+    
+    return response;
   } catch (error) {
-    return 'Unable to analyze patterns at this time. Please consult your healthcare provider for personalized advice.';
-  }
-};
-
-/**
- * Fallback recommendations when API is unavailable
- */
-const getFallbackRecommendations = (aqi: number): string => {
-  if (aqi <= 50) {
-    return 'Air quality is good. Safe to enjoy outdoor activities!';
-  } else if (aqi <= 100) {
-    return 'Air quality is moderate. Sensitive individuals should consider limiting prolonged outdoor exertion.';
-  } else if (aqi <= 150) {
-    return 'Unhealthy for sensitive groups. People with asthma should limit outdoor activities and keep inhaler nearby.';
-  } else if (aqi <= 200) {
-    return 'Unhealthy air quality. Everyone should reduce outdoor activities. People with asthma should stay indoors.';
-  } else {
-    return 'Very unhealthy or hazardous air quality! Stay indoors, keep windows closed, and have your inhaler ready.';
+    throw new Error('Unable to analyze trigger patterns. Please consult your healthcare provider for personalized advice.');
   }
 };
