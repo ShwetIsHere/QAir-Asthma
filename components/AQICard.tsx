@@ -11,7 +11,7 @@ type AQICardProps = {
   humidity: number;
 };
 
-export const AQICard = ({ aqi, category, pm25, pm10, temperature, humidity }: AQICardProps) => {
+export const AQICard = React.memo(({ aqi, category, pm25, pm10, temperature, humidity }: AQICardProps) => {
   const getAQIColor = (value: number) => {
     if (value <= 50) return 'bg-green-500';
     if (value <= 100) return 'bg-yellow-500';
@@ -78,4 +78,4 @@ export const AQICard = ({ aqi, category, pm25, pm10, temperature, humidity }: AQ
       </View>
     </View>
   );
-};
+});

@@ -391,6 +391,16 @@ export default function ProfilePage() {
     fillShadowGradientOpacity: 1,
   }), []);
 
+  // Memoize filtered places to improve performance
+  const displayedPlaces = useMemo(() => {
+    return showAllPlaces ? visitedPlaces : visitedPlaces.slice(0, 5);
+  }, [showAllPlaces, visitedPlaces]);
+
+  // Memoize triggers display to avoid re-renders
+  const displayedTriggers = useMemo(() => {
+    return showAllPlaces ? triggers : triggers.slice(0, 10);
+  }, [showAllPlaces, triggers]);
+
   if (loading) {
     return (
       <View className="flex-1 bg-gray-50 items-center justify-center">
@@ -559,32 +569,51 @@ export default function ProfilePage() {
           </View>
 
           {visitedPlaces.length > 0 ? (
-            visitedPlaces.map((place, index) => (
-              <View
-                key={index}
-                className="flex-row items-center justify-between py-4 border-b border-gray-100">
-                <View className="flex-row items-center flex-1">
-                  <View className="bg-indigo-50 w-12 h-12 rounded-xl items-center justify-center mr-3">
-                    <Text className="text-indigo-600 font-bold text-lg">{index + 1}</Text>
+            <>
+              {displayedPlaces.map((place, index) => (
+                <View
+                  key={`${place.location}-${index}`}
+                  className="flex-row items-center justify-between py-4 border-b border-gray-100">
+                  <View className="flex-row items-center flex-1">
+                    <View className="bg-indigo-50 w-12 h-12 rounded-xl items-center justify-center mr-3">
+                      <Text className="text-indigo-600 font-bold text-lg">{index + 1}</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-gray-900 font-semibold" numberOfLines={1}>
+                        {place.location}
+                      </Text>
+                      <Text className="text-gray-500 text-xs">
+                        {place.count} visit{place.count > 1 ? 's' : ''}
+                      </Text>
+                    </View>
                   </View>
-                  <View className="flex-1">
-                    <Text className="text-gray-900 font-semibold">{place.location}</Text>
-                    <Text className="text-gray-500 text-xs">
-                      {place.count} visit{place.count > 1 ? 's' : ''}
+                  <View
+                    className="px-3 py-1 rounded-lg"
+                    style={{ backgroundColor: getAQIColor(place.avgAqi) + '20' }}>
+                    <Text
+                      className="font-bold text-xs"
+                      style={{ color: getAQIColor(place.avgAqi) }}>
+                      AQI {place.avgAqi}
                     </Text>
                   </View>
                 </View>
-                <View
-                  className="px-3 py-1 rounded-lg"
-                  style={{ backgroundColor: getAQIColor(place.avgAqi) + '20' }}>
-                  <Text
-                    className="font-bold text-xs"
-                    style={{ color: getAQIColor(place.avgAqi) }}>
-                    AQI {place.avgAqi}
+              ))}
+              
+              {visitedPlaces.length > 5 && (
+                <TouchableOpacity
+                  onPress={() => setShowAllPlaces(!showAllPlaces)}
+                  className="bg-indigo-50 mt-4 py-3 rounded-xl flex-row items-center justify-center">
+                  <Text className="text-indigo-600 font-semibold mr-2">
+                    {showAllPlaces ? 'Show Less' : `Show All ${visitedPlaces.length} Places`}
                   </Text>
-                </View>
-              </View>
-            ))
+                  <Ionicons 
+                    name={showAllPlaces ? "chevron-up" : "chevron-down"} 
+                    size={20} 
+                    color="#6366F1" 
+                  />
+                </TouchableOpacity>
+              )}
+            </>
           ) : (
             <View className="py-8 items-center">
               <Ionicons name="location-outline" size={48} color="#D1D5DB" />
@@ -607,8 +636,11 @@ export default function ProfilePage() {
 
           {triggers.length > 0 ? (
             <>
-              <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={true}>
-                {(showAllPlaces ? triggers : triggers.slice(0, 10)).map((trigger, index) => {
+              <ScrollView 
+                style={{ maxHeight: showAllPlaces ? 500 : 400 }} 
+                showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}>
+                {displayedTriggers.map((trigger, index) => {
                   const date = new Date(trigger.timestamp);
                   const dateStr = date.toLocaleDateString('en-US', { 
                     month: 'short', 

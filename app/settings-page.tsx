@@ -146,21 +146,37 @@ export default function SettingsPage() {
 
   const handleClearCache = async () => {
     Alert.alert(
-      'Clear Cache',
-      'Are you sure you want to clear the app cache? This will not delete your trigger data.',
+      'Clear Cache & Restart',
+      'This will clear all cached data and restart the app fresh. Your trigger data will be preserved in the database.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Clear',
+          text: 'Clear & Restart',
           style: 'destructive',
           onPress: async () => {
             try {
-              // Clear specific cache items (not user data)
-              await AsyncStorage.removeItem('mapCache');
-              await AsyncStorage.removeItem('weatherCache');
-              Alert.alert('Success', 'Cache cleared successfully!');
+              // Clear all AsyncStorage cache
+              await AsyncStorage.clear();
+              
+              // Show success message
+              Alert.alert(
+                'Success', 
+                'Cache cleared! App will restart now.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Force reload the app
+                      if (typeof window !== 'undefined' && window.location) {
+                        window.location.reload();
+                      }
+                    }
+                  }
+                ]
+              );
             } catch (error) {
-              Alert.alert('Error', 'Failed to clear cache');
+              console.error('Clear cache error:', error);
+              Alert.alert('Error', 'Failed to clear cache. Please try again.');
             }
           },
         },
@@ -199,19 +215,19 @@ export default function SettingsPage() {
   const handleContactUs = () => {
     Alert.alert(
       'Contact Us',
-      'How would you like to contact us?',
+      'Choose a team member to contact:',
       [
         {
-          text: 'Email',
-          onPress: () => Linking.openURL('mailto:support@qairapp.com?subject=QAir Support Request'),
+          text: 'Shwet Patel',
+          onPress: () => Linking.openURL('mailto:patel.s.manojbhai@nuv.ac.in?subject=QAir Support Request'),
         },
         {
-          text: 'Phone',
-          onPress: () => Linking.openURL('tel:+1234567890'),
+          text: 'Jai Jaiswal',
+          onPress: () => Linking.openURL('mailto:jay.l.jaiswal@nuv.ac.in?subject=QAir Support Request'),
         },
         {
-          text: 'Website',
-          onPress: () => Linking.openURL('https://qairapp.com'),
+          text: 'Ujjaval Rathod',
+          onPress: () => Linking.openURL('mailto:ujjaval.r.rathod@nuv.ac.in?subject=QAir Support Request'),
         },
         { text: 'Cancel', style: 'cancel' },
       ]
@@ -221,14 +237,8 @@ export default function SettingsPage() {
   const handleAboutApp = () => {
     Alert.alert(
       'About QAir',
-      `Version ${APP_VERSION}\n\nQAir helps asthma patients track their triggers and monitor air quality in real-time.\n\nDeveloped with ❤️ for better respiratory health.\n\n© 2025 QAir App. All rights reserved.`,
-      [
-        {
-          text: 'Rate Us',
-          onPress: () => Alert.alert('Thank you!', 'Rating feature coming soon!'),
-        },
-        { text: 'OK' },
-      ]
+      `Version ${APP_VERSION}\n\n🫁 QAir - Smart Asthma Management\n\nQAir is designed specifically for asthma patients to help manage and understand their triggers better.\n\n✨ Key Features:\n• Inhaler Trigger Tracking - Mark locations where you used your inhaler\n• Real-time Air Quality Monitoring - Check AQI, PM2.5, temperature, and humidity\n• AI-Powered Health Insights - Get personalized suggestions about weather conditions\n• Historical Analysis - View your trigger patterns and visited locations\n• Smart Alerts - Receive notifications about poor air quality\n\n📍 How It Works:\n1. When you use your inhaler, tap the map to mark the trigger location\n2. The app records weather conditions and air quality data\n3. AI analyzes if current conditions are suitable for you\n4. View all your triggers and patterns in the Profile tab\n\n👥 Developed by:\nShwet Patel, Jai Jaiswal & Ujjaval Rathod\n\n© 2025 QAir App. All rights reserved.\nMade with ❤️ for better respiratory health.`,
+      [{ text: 'OK' }]
     );
   };
 

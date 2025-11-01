@@ -215,8 +215,36 @@ export default function Settings() {
               iconColor="#F59E0B"
               iconBg="#FEF3C7"
               title="Clear Cache"
-              subtitle="Free up storage space"
-              onPress={() => Alert.alert('Success', 'Cache cleared successfully')}
+              subtitle="Clear all cached data and restart fresh"
+              onPress={() => Alert.alert(
+                'Clear Cache & Restart',
+                'This will clear all cached data and restart the app. Your trigger data will be preserved.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Clear & Restart',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        const AsyncStorage = await import('@react-native-async-storage/async-storage').then(m => m.default);
+                        await AsyncStorage.clear();
+                        Alert.alert('Success', 'Cache cleared! App will restart now.', [
+                          {
+                            text: 'OK',
+                            onPress: () => {
+                              if (typeof window !== 'undefined' && window.location) {
+                                window.location.reload();
+                              }
+                            }
+                          }
+                        ]);
+                      } catch (error) {
+                        Alert.alert('Error', 'Failed to clear cache');
+                      }
+                    }
+                  }
+                ]
+              )}
             />
           </View>
 
@@ -237,7 +265,34 @@ export default function Settings() {
               iconBg="#EDE9FE"
               title="Contact Us"
               subtitle="Send us your feedback"
-              onPress={() => Alert.alert('Contact', 'Email: support@qair.com')}
+              onPress={() => Alert.alert(
+                'Contact Us',
+                'Choose a team member to contact:',
+                [
+                  {
+                    text: 'Shwet Patel',
+                    onPress: () => {
+                      const { Linking } = require('react-native');
+                      Linking.openURL('mailto:patel.s.manojbhai@nuv.ac.in?subject=QAir Support Request');
+                    }
+                  },
+                  {
+                    text: 'Jai Jaiswal',
+                    onPress: () => {
+                      const { Linking } = require('react-native');
+                      Linking.openURL('mailto:jay.l.jaiswal@nuv.ac.in?subject=QAir Support Request');
+                    }
+                  },
+                  {
+                    text: 'Ujjaval Rathod',
+                    onPress: () => {
+                      const { Linking } = require('react-native');
+                      Linking.openURL('mailto:ujjaval.r.rathod@nuv.ac.in?subject=QAir Support Request');
+                    }
+                  },
+                  { text: 'Cancel', style: 'cancel' }
+                ]
+              )}
             />
             <SettingItem
               icon="information-circle-outline"
@@ -245,7 +300,11 @@ export default function Settings() {
               iconBg="#EDE9FE"
               title="About"
               subtitle="Version 1.0.0"
-              onPress={() => Alert.alert('QAir', 'Asthma Monitoring App\nVersion 1.0.0')}
+              onPress={() => Alert.alert(
+                'About QAir',
+                '🫁 QAir - Smart Asthma Management\n\nVersion 1.0.0\n\nQAir is designed for asthma patients to help manage and understand their triggers.\n\n✨ Features:\n• Inhaler Trigger Tracking\n• Real-time Air Quality Monitoring\n• AI-Powered Health Insights\n• Historical Analysis\n• Smart Alerts\n\n📍 How It Works:\n1. Mark trigger location when using inhaler\n2. App records weather & air quality\n3. AI analyzes conditions for you\n4. View patterns in Profile tab\n\n👥 Developed by:\nShwet Patel, Jai Jaiswal & Ujjaval Rathod\n\n© 2025 QAir App. Made with ❤️',
+                [{ text: 'OK' }]
+              )}
             />
           </View>
 

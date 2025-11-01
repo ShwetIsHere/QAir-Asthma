@@ -6,7 +6,7 @@ type CardProps = {
   variant?: 'default' | 'outlined' | 'elevated';
 } & ViewProps;
 
-export const Card = ({ children, variant = 'default', className, ...props }: CardProps) => {
+export const Card = React.memo(({ children, variant = 'default', className, ...props }: CardProps) => {
   const variantStyles = {
     default: 'bg-white rounded-3xl p-5',
     outlined: 'bg-white rounded-3xl p-5 border-2 border-gray-200',
@@ -18,4 +18,4 @@ export const Card = ({ children, variant = 'default', className, ...props }: Car
       {children}
     </View>
   );
-};
+});
