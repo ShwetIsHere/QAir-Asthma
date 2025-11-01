@@ -283,12 +283,12 @@ export default function Dashboard() {
           <MapView
             ref={mapRef}
             style={StyleSheet.absoluteFillObject}
-            mapType="satellite"
+            mapType="standard"
             initialRegion={{
               latitude: location.coords.latitude,
               longitude: location.coords.longitude,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
             }}
             onMapReady={() => setMapReady(true)}
             loadingEnabled
@@ -298,6 +298,9 @@ export default function Dashboard() {
             showsMyLocationButton={false}
             showsCompass
             showsScale
+            showsPointsOfInterest={true}
+            showsBuildings={true}
+            showsTraffic={false}
             mapPadding={{ top: 0, right: 0, bottom: 120, left: 0 }}>
             {/* Inhaler Trigger Markers */}
             {triggers.map((trigger) => (
