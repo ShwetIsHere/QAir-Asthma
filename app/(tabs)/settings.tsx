@@ -19,13 +19,29 @@ export default function Settings() {
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    loadUserData();
+    let isMounted = true;
+    
+    const loadData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (isMounted) {
+        setUser(user);
+      }
+    };
+    
+    loadData();
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+      // Clear user state when leaving settings
+      setUser(null);
+      setNotifications(true);
+      setLocationTracking(true);
+      setDarkMode(false);
+    };
   }, []);
 
-  const loadUserData = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
-  };
+
 
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [

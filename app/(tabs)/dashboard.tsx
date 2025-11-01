@@ -43,12 +43,33 @@ export default function Dashboard() {
   const bottomSheetRef = useRef<BottomSheet>(null);
 
   useEffect(() => {
-    initializeLocation();
-    loadTriggers();
+    let isMounted = true;
+    
+    const initialize = async () => {
+      if (isMounted) {
+        await initializeLocation();
+        await loadTriggers();
+      }
+    };
+    
+    initialize();
+    
+    return () => {
+      isMounted = false;
+      // Cleanup: Clear state when component unmounts
+      setTriggers([]);
+      setRedZones([]);
+      setSelectedTrigger(null);
+    };
   }, []);
 
   useEffect(() => {
     calculateRedZones();
+    
+    return () => {
+      // Cleanup red zones calculation
+      setRedZones([]);
+    };
   }, [triggers]);
 
   const initializeLocation = async () => {

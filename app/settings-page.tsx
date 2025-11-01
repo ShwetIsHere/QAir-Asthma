@@ -25,6 +25,16 @@ export default function SettingsPage() {
   const [locationTracking, setLocationTracking] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
 
+  // Cleanup function to prevent memory leaks
+  React.useEffect(() => {
+    return () => {
+      // Reset all settings states when leaving the page
+      setPushNotifications(true);
+      setLocationTracking(true);
+      setDarkMode(false);
+    };
+  }, []);
+
   const handlePrivacySecurity = () => {
     Alert.alert(
       'Privacy & Security',

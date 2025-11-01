@@ -52,14 +52,24 @@ export default function TriggerDetails() {
   const timestamp = params.timestamp as string;
 
   useEffect(() => {
-    loadWeatherData();
-    loadPlaceName();
+    let isMounted = true;
+    
+    const initialize = async () => {
+      if (isMounted) {
+        await loadWeatherData();
+        await loadPlaceName();
+      }
+    };
+    
+    initialize();
     
     // Cleanup function to prevent memory leaks
     return () => {
+      isMounted = false;
       setWeatherData(null);
       setAiAnalysis('');
       setHourlyForecast([]);
+      setError(null);
     };
   }, []);
 

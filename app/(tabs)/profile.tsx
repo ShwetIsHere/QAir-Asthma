@@ -62,14 +62,39 @@ export default function ProfilePage() {
   const [showAllPlaces, setShowAllPlaces] = useState(false);
 
   useEffect(() => {
-    loadUserData();
-    loadTriggers();
+    let isMounted = true;
+    
+    const initialize = async () => {
+      if (isMounted) {
+        await loadUserData();
+        await loadTriggers();
+      }
+    };
+    
+    initialize();
+    
+    return () => {
+      isMounted = false;
+      // Cleanup: Clear state when component unmounts
+      setTriggers([]);
+      setVisitedPlaces([]);
+      setWeeklyData([0, 0, 0, 0, 0, 0, 0]);
+      setMarkedDates({});
+    };
   }, []);
 
   // Reload data when the screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      loadTriggers();
+      let isMounted = true;
+      
+      if (isMounted) {
+        loadTriggers();
+      }
+      
+      return () => {
+        isMounted = false;
+      };
     }, [])
   );
 

@@ -80,8 +80,11 @@ export default function BluetoothManager({
   // Monitor Bluetooth state changes in real-time
   useEffect(() => {
     let subscription: any = null;
+    let isMounted = true;
 
     const setupBLE = async () => {
+      if (!isMounted) return;
+      
       const manager = await initializeBLE();
       if (!manager) {
         Alert.alert(
@@ -93,19 +96,34 @@ export default function BluetoothManager({
       }
 
       subscription = manager.onStateChange((state: any) => {
-        setBluetoothEnabled(state === State.PoweredOn);
+        if (isMounted) {
+          setBluetoothEnabled(state === State.PoweredOn);
+        }
       }, true);
 
       // Check initial state
-      checkBluetoothEnabled();
+      if (isMounted) {
+        checkBluetoothEnabled();
+      }
     };
 
     setupBLE();
 
     return () => {
+      isMounted = false;
       if (subscription) {
         subscription.remove();
       }
+      // Cleanup: Stop any ongoing scans and clear device list
+      const cleanup = async () => {
+        const manager = await initializeBLE();
+        if (manager) {
+          manager.stopDeviceScan();
+        }
+      };
+      cleanup();
+      setAvailableDevices([]);
+      setIsScanning(false);
     };
   }, []);
 
@@ -253,7 +271,7 @@ export default function BluetoothManager({
     }
 
     setIsScanning(true);
-    setAvailableDevices([]);
+    setAvailableDevices([]); // Clear previous devices
 
     try {
       // Start real BLE scanning
@@ -265,6 +283,9 @@ export default function BluetoothManager({
         Alert.alert('BLE Not Available', 'Bluetooth features require a development build.');
         return;
       }
+      
+      // Keep track of discovered devices to avoid duplicates
+      const discoveredDevices = new Map<string, BluetoothDevice>();
       
       manager.startDeviceScan(
         null, // null = scan for all devices
@@ -289,25 +310,16 @@ export default function BluetoothManager({
               isConnected: false,
             };
 
-            setAvailableDevices(prevDevices => {
-              // Check if device already exists
-              const existingIndex = prevDevices.findIndex(d => d.id === newDevice.id);
-              
-              if (existingIndex !== -1) {
-                // Update existing device (in case RSSI changed)
-                const updated = [...prevDevices];
-                updated[existingIndex] = newDevice;
-                return updated;
-              }
-              
-              // Add new device
-              return [...prevDevices, newDevice];
-            });
+            // Add to map to avoid duplicates
+            discoveredDevices.set(device.id, newDevice);
+            
+            // Update state with all discovered devices
+            setAvailableDevices(Array.from(discoveredDevices.values()));
           }
         }
       );
 
-      // Stop scanning after 10 seconds
+      // Stop scanning after 10 seconds and cleanup
       setTimeout(async () => {
         console.log('Stopping BLE scan...');
         const manager = await initializeBLE();
@@ -315,6 +327,8 @@ export default function BluetoothManager({
           manager.stopDeviceScan();
         }
         setIsScanning(false);
+        // Clear the devices map to free memory
+        discoveredDevices.clear();
       }, 10000);
     } catch (error) {
       console.error('Error starting scan:', error);

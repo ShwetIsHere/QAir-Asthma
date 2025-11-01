@@ -151,7 +151,21 @@ export default function NewsPage() {
 
   // Load news on component mount
   useEffect(() => {
-    fetchNews();
+    let isMounted = true;
+    
+    const loadNews = async () => {
+      if (isMounted) {
+        await fetchNews();
+      }
+    };
+    
+    loadNews();
+    
+    return () => {
+      isMounted = false;
+      // Cleanup: Clear news data when component unmounts
+      setNews([]);
+    };
   }, []);
 
   const onRefresh = async () => {
