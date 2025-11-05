@@ -83,6 +83,18 @@ export default function Dashboard() {
       const currentLocation = await Location.getCurrentPositionAsync({});
       setLocation(currentLocation);
       setLoading(false);
+      
+      // Auto-zoom to user location after map loads
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.animateToRegion({
+            latitude: currentLocation.coords.latitude,
+            longitude: currentLocation.coords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }, 1000);
+        }
+      }, 500);
     } catch (error) {
       Alert.alert('Error', 'Failed to get location');
       setLoading(false);
@@ -241,8 +253,8 @@ export default function Dashboard() {
       mapRef.current.animateToRegion({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
+        latitudeDelta: 0.001,
+        longitudeDelta: 0.001,
       });
     }
   };
