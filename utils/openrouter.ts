@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-const OPENROUTER_API_KEY = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
-const BASE_URL = 'https://openrouter.ai/api/v1';
+const GEMINI_API_KEY = 'AIzaSyBAZOApw2YeqAAGW9GAqr6tlT6M-TeWuDk';
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+const GEMINI_MODEL = 'models/gemini-flash-lite-latest';
 
 // Simple in-memory cache for AI responses (10 minute TTL to reduce API calls)
 const responseCache = new Map<string, { data: string; timestamp: number }>();
@@ -15,7 +16,7 @@ const getCacheKey = (weatherData: any): string => {
 };
 
 /**
- * OpenRouter API client for AI-powered features
+ * Google Gemini API client for AI-powered features
  * Can be used for health recommendations, trigger analysis, etc.
  */
 
@@ -24,11 +25,12 @@ export interface ChatMessage {
   content: string;
 }
 
-export interface ChatCompletionResponse {
-  choices: Array<{
-    message: {
-      role: string;
-      content: string;
+export interface GeminiResponse {
+  candidates: Array<{
+    content: {
+      parts: Array<{
+        text: string;
+      }>;
     };
   }>;
   error?: {
@@ -43,21 +45,21 @@ export interface ChatCompletionResponse {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Send a chat completion request to OpenRouter with retry logic
- * Using FREE Google Gemini 2.0 Flash model
+ * Send a chat completion request to Google Gemini with retry logic
+ * Using Gemini Flash Lite model
  */
 export const chatCompletion = async (
   messages: ChatMessage[],
-  model: string = 'google/gemini-2.0-flash-exp:free',
+  model: string = GEMINI_MODEL,
   retries: number = 2
 ): Promise<string> => {
   let lastError: any;
   
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      if (!OPENROUTER_API_KEY) {
-        console.error('OpenRouter API key is missing!');
-        throw new Error('OpenRouter API key not configured. Please add EXPO_PUBLIC_OPENROUTER_API_KEY to your .env file.');
+      if (!GEMINI_API_KEY) {
+        console.error('Gemini API key is missing!');
+        throw new Error('Gemini API key not configured.');
       }
 
       if (attempt > 0) {
@@ -66,40 +68,59 @@ export const chatCompletion = async (
         await delay(waitTime);
       }
 
-      console.log('Making OpenRouter API request with Gemini 2.0 Flash (FREE)...');
-      console.log('API Key present:', OPENROUTER_API_KEY.substring(0, 10) + '...');
+      console.log('Making Gemini API request with Flash Lite model...');
+      
+      // Convert messages to Gemini format
+      let prompt = '';
+      let systemInstruction = '';
+      
+      for (const msg of messages) {
+        if (msg.role === 'system') {
+          systemInstruction = msg.content;
+        } else if (msg.role === 'user') {
+          prompt += msg.content + '\n';
+        }
+      }
+      
+      // Combine system instruction with prompt
+      const fullPrompt = systemInstruction 
+        ? `${systemInstruction}\n\n${prompt}` 
+        : prompt;
+
       console.log('Request payload:', {
         model,
-        messages: messages.map(m => ({ role: m.role, content: m.content.substring(0, 100) + '...' }))
+        prompt: fullPrompt.substring(0, 100) + '...'
       });
 
-      const response = await axios.post<ChatCompletionResponse>(
-        `${BASE_URL}/chat/completions`,
+      const response = await axios.post<GeminiResponse>(
+        `${GEMINI_BASE_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`,
         {
-          model,
-          messages,
-          temperature: 0.7,
-          max_tokens: 300,
+          contents: [{
+            parts: [{
+              text: fullPrompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 300,
+          }
         },
         {
           headers: {
-            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-            'HTTP-Referer': 'https://github.com/ShwetIsHere/QAir-Asthma',
-            'X-Title': 'QAir Asthma App',
             'Content-Type': 'application/json',
           },
           timeout: 30000, // 30 second timeout
         }
       );
 
-      console.log('OpenRouter response received successfully!');
+      console.log('Gemini response received successfully!');
       
       // Check for error in response
       if (response.data.error) {
-        throw new Error(`OpenRouter API Error: ${response.data.error.message}`);
+        throw new Error(`Gemini API Error: ${response.data.error.message}`);
       }
 
-      const content = response.data.choices[0]?.message?.content;
+      const content = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (!content) {
         throw new Error('No response content received from AI');
@@ -108,12 +129,12 @@ export const chatCompletion = async (
       return content;
     } catch (error: any) {
       lastError = error;
-      console.error(`OpenRouter API error (attempt ${attempt + 1}/${retries + 1}):`, error?.message);
+      console.error(`Gemini API error (attempt ${attempt + 1}/${retries + 1}):`, error?.message);
       
       // Don't retry on these errors
       const status = error?.response?.status;
-      if (status === 401 || status === 402 || status === 400) {
-        break; // Don't retry authentication, payment, or bad request errors
+      if (status === 401 || status === 403 || status === 400) {
+        break; // Don't retry authentication or bad request errors
       }
       
       // Only retry on 429 (rate limit) or network errors
@@ -136,12 +157,12 @@ export const chatCompletion = async (
   });
   
   // Check for specific error codes and throw proper errors
-  if (lastError?.response?.status === 402) {
-    throw new Error('OpenRouter account has insufficient credits. The free tier may have limits.');
+  if (lastError?.response?.status === 403) {
+    throw new Error('Gemini API key is invalid or expired. Please check your API key.');
   } else if (lastError?.response?.status === 401) {
-    throw new Error('OpenRouter API key is invalid or expired. Please check your API key.');
+    throw new Error('Gemini API key is unauthorized. Please check your API key.');
   } else if (lastError?.response?.status === 429) {
-    throw new Error('Rate limit exceeded. The service is very busy right now. Please try again in a minute.');
+    throw new Error('Rate limit exceeded. Please try again in a minute.');
   } else if (lastError?.response?.status === 400) {
     throw new Error('Invalid request format. Please try again.');
   } else if (lastError?.code === 'ECONNABORTED' || lastError?.message?.includes('timeout')) {
@@ -201,8 +222,8 @@ Is this location suitable for outdoor activities? Give brief professional assess
   ];
 
   try {
-    console.log('Sending request to OpenRouter AI...');
-    const response = await chatCompletion(messages, 'google/gemini-2.0-flash-exp:free');
+    console.log('Sending request to Gemini AI...');
+    const response = await chatCompletion(messages, GEMINI_MODEL);
     
     if (!response || response.trim().length === 0) {
       throw new Error('Empty response received from AI');
