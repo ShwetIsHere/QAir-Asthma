@@ -15,6 +15,9 @@ import { Calendar } from 'react-native-calendars';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/utils/supabase';
 import BluetoothManager from '@/components/BluetoothManager';
+import EmergencyContactsManager from '@/components/EmergencyContactsManager';
+import AsthmaActionPlanManager from '@/components/AsthmaActionPlanManager';
+import ChallengesManager from '@/components/ChallengesManager';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -759,6 +762,47 @@ export default function ProfilePage() {
               </Text>
             </View>
           )}
+        </View>
+
+        {/* Emergency Settings Section */}
+        <View className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 mx-5 mt-5">
+          <View className="flex-row items-center mb-2">
+            <View className="bg-red-500 w-10 h-10 rounded-full items-center justify-center">
+              <Ionicons name="warning" size={24} color="white" />
+            </View>
+            <Text className="text-red-900 font-bold text-2xl ml-3">Emergency Setup</Text>
+          </View>
+          <Text className="text-red-700 text-sm">
+            Configure emergency contacts and action plan for the SOS button
+          </Text>
+        </View>
+
+        {/* Emergency Contacts Manager */}
+        <View className="mx-5 mt-5">
+          <EmergencyContactsManager />
+        </View>
+
+        {/* Asthma Action Plan Manager */}
+        <View className="mx-5 mt-5">
+          <AsthmaActionPlanManager />
+        </View>
+
+        {/* Personalized Challenges Section */}
+        <View className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-2xl p-4 mx-5 mt-5">
+          <View className="flex-row items-center mb-2">
+            <View className="bg-indigo-600 w-10 h-10 rounded-full items-center justify-center">
+              <Ionicons name="trophy" size={24} color="white" />
+            </View>
+            <Text className="text-indigo-900 font-bold text-2xl ml-3">Your Challenges</Text>
+          </View>
+          <Text className="text-indigo-700 text-sm">
+            Complete personalized challenges to stay motivated and earn points!
+          </Text>
+        </View>
+
+        {/* Challenges Manager */}
+        <View className="mx-5 mt-5 mb-5 bg-white rounded-3xl shadow-md overflow-hidden" style={{ elevation: 4, height: 700 }}>
+          <ChallengesManager />
         </View>
 
         {/* Logout Button */}

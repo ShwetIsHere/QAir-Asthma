@@ -11,6 +11,7 @@ import { AQICard } from '@/components/AQICard';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { fetchAirQuality } from '@/utils/airQuality';
 import BluetoothManager from '@/components/BluetoothManager';
+import SOSButton from '@/components/SOSButton';
 
 type InhalerTrigger = {
   id: string;
@@ -349,6 +350,11 @@ export default function Dashboard() {
 
         {/* Floating Action Buttons */}
         <View className="absolute right-6 bottom-32 space-y-3">
+          {/* SOS Button */}
+          <SOSButton />
+          
+          <View className="h-4" />
+          
           <TouchableOpacity
             onPress={centerOnLocation}
             className="bg-white w-16 h-16 rounded-full items-center justify-center shadow-2xl"
