@@ -15,10 +15,15 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow QAir to access your location to track asthma triggers."
+          "locationAlwaysAndWhenInUsePermission": "Allow QAir to access your location to track asthma triggers.",
+          "locationAlwaysPermission": "Allow QAir to access your location in the background for proactive asthma risk alerts and geofencing.",
+          "locationWhenInUsePermission": "Allow QAir to access your location to track asthma triggers and environmental conditions.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isIosBackgroundLocationEnabled": true
         }
       ],
       [
@@ -65,6 +70,7 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
         "BLUETOOTH_SCAN",
@@ -74,6 +80,7 @@
         "WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_CONNECT"

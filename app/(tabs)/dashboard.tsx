@@ -12,6 +12,8 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { fetchAirQuality } from '@/utils/airQuality';
 import BluetoothManager from '@/components/BluetoothManager';
 import SOSButton from '@/components/SOSButton';
+import TestPredictiveRiskAPIs from '@/components/TestPredictiveRiskAPIs';
+import PredictiveRiskAlert from '@/components/PredictiveRiskAlert';
 
 type InhalerTrigger = {
   id: string;
@@ -40,6 +42,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [bluetoothModalVisible, setBluetoothModalVisible] = useState(false);
+  const [testApisModalVisible, setTestApisModalVisible] = useState(false);
+  const [riskMonitorModalVisible, setRiskMonitorModalVisible] = useState(false);
   const mapRef = useRef<MapView>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
 
@@ -355,6 +359,22 @@ export default function Dashboard() {
           
           <View className="h-4" />
           
+          {/* Risk Monitor Button */}
+          <TouchableOpacity
+            onPress={() => setRiskMonitorModalVisible(true)}
+            className="bg-yellow-500 w-16 h-16 rounded-full items-center justify-center shadow-2xl"
+            style={{ elevation: 8 }}>
+            <Ionicons name="shield-checkmark" size={32} color="white" />
+          </TouchableOpacity>
+          
+          {/* API Test Button */}
+          <TouchableOpacity
+            onPress={() => setTestApisModalVisible(true)}
+            className="bg-purple-500 w-16 h-16 rounded-full items-center justify-center shadow-2xl"
+            style={{ elevation: 8 }}>
+            <Ionicons name="flask" size={32} color="white" />
+          </TouchableOpacity>
+          
           <TouchableOpacity
             onPress={centerOnLocation}
             className="bg-white w-16 h-16 rounded-full items-center justify-center shadow-2xl"
@@ -431,6 +451,42 @@ export default function Dashboard() {
                 }}
               />
             </View>
+          </View>
+        </Modal>
+
+        {/* API Test Modal */}
+        <Modal
+          visible={testApisModalVisible}
+          animationType="slide"
+          onRequestClose={() => setTestApisModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>API Test Suite</Text>
+              <TouchableOpacity
+                onPress={() => setTestApisModalVisible(false)}
+                style={styles.closeButton}>
+                <Ionicons name="close-circle" size={32} color="#6366F1" />
+              </TouchableOpacity>
+            </View>
+            <TestPredictiveRiskAPIs />
+          </View>
+        </Modal>
+
+        {/* Risk Monitor Modal */}
+        <Modal
+          visible={riskMonitorModalVisible}
+          animationType="slide"
+          onRequestClose={() => setRiskMonitorModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Risk Monitor</Text>
+              <TouchableOpacity
+                onPress={() => setRiskMonitorModalVisible(false)}
+                style={styles.closeButton}>
+                <Ionicons name="close-circle" size={32} color="#6366F1" />
+              </TouchableOpacity>
+            </View>
+            <PredictiveRiskAlert />
           </View>
         </Modal>
       </View>
