@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Modal, Linking, Platform } from 'react-native';
 import { Stack, router } from 'expo-router';
-import MapView, { Marker, Circle } from 'react-native-maps';
+import MapView, { Marker, Circle, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet from '@gorhom/bottom-sheet';
@@ -31,6 +31,15 @@ type RedZone = {
   count: number;
 };
 
+type Hospital = {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  vicinity?: string;
+  distance?: number;
+};
+
 export default function Dashboard() {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [triggers, setTriggers] = useState<InhalerTrigger[]>([]);
@@ -39,6 +48,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [bluetoothModalVisible, setBluetoothModalVisible] = useState(false);
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [showingHospitals, setShowingHospitals] = useState(false);
+  const [loadingHospitals, setLoadingHospitals] = useState(false);
   const mapRef = useRef<MapView>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
 
@@ -259,6 +271,127 @@ export default function Dashboard() {
     }
   };
 
+  const fetchNearbyHospitals = async () => {
+    if (!location) {
+      Alert.alert('Error', 'Location not available');
+      return;
+    }
+
+    setLoadingHospitals(true);
+
+    try {
+      // Use OpenStreetMap Overpass API (completely free, no API key needed)
+      const radius = 5000; // 5km radius
+      const lat = location.coords.latitude;
+      const lon = location.coords.longitude;
+
+      // Overpass QL query to find hospitals
+      const query = `
+        [out:json][timeout:25];
+        (
+          node["amenity"="hospital"](around:${radius},${lat},${lon});
+          way["amenity"="hospital"](around:${radius},${lat},${lon});
+          node["amenity"="clinic"](around:${radius},${lat},${lon});
+          way["amenity"="clinic"](around:${radius},${lat},${lon});
+        );
+        out center;
+      `;
+
+      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+      
+      console.log('Fetching hospitals from OpenStreetMap...');
+      
+      const response = await fetch(url);
+      const data = await response.json();
+
+      console.log('OSM Response:', data);
+
+      if (data.elements && data.elements.length > 0) {
+        const hospitalData: Hospital[] = data.elements.map((element: any, index: number) => {
+          const hospitalLat = element.lat || element.center?.lat;
+          const hospitalLon = element.lon || element.center?.lon;
+          
+          return {
+            id: element.id?.toString() || `hospital-${index}`,
+            name: element.tags?.name || element.tags?.['name:en'] || 'Unnamed Hospital/Clinic',
+            latitude: hospitalLat,
+            longitude: hospitalLon,
+            vicinity: element.tags?.['addr:street'] || element.tags?.['addr:city'] || '',
+            distance: getDistance(lat, lon, hospitalLat, hospitalLon),
+          };
+        }).filter((h: Hospital) => h.latitude && h.longitude);
+
+        // Sort by distance and take only top 5
+        hospitalData.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+        const topHospitals = hospitalData.slice(0, 5);
+
+        console.log('Found hospitals:', topHospitals.length);
+
+        setHospitals(topHospitals);
+        setShowingHospitals(true);
+
+        // Zoom out to show hospitals
+        if (mapRef.current && topHospitals.length > 0) {
+          mapRef.current.animateToRegion({
+            latitude: lat,
+            longitude: lon,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }, 1000);
+        }
+
+        Alert.alert(
+          'Nearest Hospitals',
+          `Showing ${topHospitals.length} nearest medical facilities`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('No Results', 'No hospitals or clinics found within 5km radius. This area may not have detailed map data.');
+      }
+    } catch (error) {
+      console.error('Error fetching hospitals:', error);
+      Alert.alert('Error', 'Failed to fetch nearby hospitals. Please check your internet connection.');
+    } finally {
+      setLoadingHospitals(false);
+    }
+  };
+
+  const toggleHospitals = () => {
+    if (showingHospitals) {
+      setHospitals([]);
+      setShowingHospitals(false);
+    } else {
+      fetchNearbyHospitals();
+    }
+  };
+
+  const openDirections = (hospital: Hospital) => {
+    const scheme = Platform.select({
+      ios: 'maps:',
+      android: 'geo:',
+    });
+    
+    const latLng = `${hospital.latitude},${hospital.longitude}`;
+    const label = encodeURIComponent(hospital.name);
+    
+    const url = Platform.select({
+      ios: `${scheme}?daddr=${latLng}&dirflg=d`,
+      android: `${scheme}${latLng}?q=${latLng}(${label})`,
+    });
+
+    if (url) {
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          // Fallback to Google Maps web
+          const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latLng}&destination_place_id=${hospital.name}`;
+          Linking.openURL(googleMapsUrl);
+        }
+      });
+    }
+  };
+
   if (loading) {
     return <LoadingScreen message="Loading map..." />;
   }
@@ -344,11 +477,71 @@ export default function Dashboard() {
                 strokeWidth={2}
               />
             ))}
+
+            {/* Hospital Markers */}
+            {hospitals.map((hospital) => (
+              <Marker
+                key={hospital.id}
+                coordinate={{
+                  latitude: hospital.latitude,
+                  longitude: hospital.longitude,
+                }}
+                title={hospital.name}
+                description={`${hospital.vicinity || ''} - ${((hospital.distance || 0) / 1000).toFixed(2)} km away`}>
+                <View className="bg-green-500 w-12 h-12 rounded-full items-center justify-center border-3 border-white shadow-xl"
+                  style={{ elevation: 8 }}>
+                  <Ionicons name="medical" size={24} color="white" />
+                </View>
+                <Callout onPress={() => openDirections(hospital)}>
+                  <View style={{ width: 200, padding: 10 }}>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 5 }}>
+                      {hospital.name}
+                    </Text>
+                    {hospital.vicinity && (
+                      <Text style={{ fontSize: 12, color: '#666', marginBottom: 5 }}>
+                        {hospital.vicinity}
+                      </Text>
+                    )}
+                    <Text style={{ fontSize: 12, color: '#6366F1', marginBottom: 8 }}>
+                      {((hospital.distance || 0) / 1000).toFixed(2)} km away
+                    </Text>
+                    <View style={{ 
+                      backgroundColor: '#6366F1', 
+                      padding: 8, 
+                      borderRadius: 8, 
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center'
+                    }}>
+                      <Ionicons name="navigate" size={16} color="white" />
+                      <Text style={{ color: 'white', fontWeight: 'bold', marginLeft: 5 }}>
+                        Get Directions
+                      </Text>
+                    </View>
+                  </View>
+                </Callout>
+              </Marker>
+            ))}
           </MapView>
         )}
 
         {/* Floating Action Buttons */}
         <View className="absolute right-6 bottom-32 space-y-3">
+          <TouchableOpacity
+            onPress={toggleHospitals}
+            className={`${showingHospitals ? 'bg-green-500' : 'bg-white'} w-16 h-16 rounded-full items-center justify-center shadow-2xl mb-3`}
+            style={{ elevation: 8 }}
+            disabled={loadingHospitals}>
+            {loadingHospitals ? (
+              <ActivityIndicator size="small" color={showingHospitals ? 'white' : '#6366F1'} />
+            ) : (
+              <Ionicons 
+                name="medical" 
+                size={32} 
+                color={showingHospitals ? 'white' : '#6366F1'} 
+              />
+            )}
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={centerOnLocation}
             className="bg-white w-16 h-16 rounded-full items-center justify-center shadow-2xl"
