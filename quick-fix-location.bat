@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo QAir - Quick Fix for Background Location
+echo QAir - Quick Fix for Background Locawtion
 echo ========================================
 echo.
 echo This script will:

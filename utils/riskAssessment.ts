@@ -195,6 +195,8 @@ export const checkTriggerSimilarity = async (
     // Fetch user's trigger history
     const triggerHistory = await fetchUserTriggerHistory(userId);
 
+    console.log(`📚 Found ${triggerHistory.length} triggers in database`);
+
     if (triggerHistory.length === 0) {
       console.log('No trigger history found for user');
       return {
@@ -208,13 +210,19 @@ export const checkTriggerSimilarity = async (
     }
 
     // Compare current data with each past trigger
-    const similarities = triggerHistory.map((trigger) => ({
-      trigger,
-      ...calculateTriggerSimilarity(currentData, trigger),
-    }));
+    const similarities = triggerHistory.map((trigger) => {
+      const similarity = calculateTriggerSimilarity(currentData, trigger);
+      console.log(`🔍 Trigger ${trigger.id.substring(0, 8)}... Score: ${similarity.score}% Factors: [${similarity.matchingFactors.join(', ')}]`);
+      return {
+        trigger,
+        ...similarity,
+      };
+    });
 
     // Sort by similarity score (highest first)
     similarities.sort((a, b) => b.score - a.score);
+    
+    console.log(`🏆 Best match: ${similarities[0]?.score || 0}% similarity`);
 
     // Get top matches (score >= 50% similarity)
     const significantMatches = similarities.filter((s) => s.score >= 50);

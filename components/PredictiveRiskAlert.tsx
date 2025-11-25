@@ -21,12 +21,11 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/utils/supabase';
 import { getCurrentLocation, requestBackgroundLocationPermission, getLocationPermissionStatus } from '@/utils/geofencing';
 import { fetchEnvironmentalData, EnvironmentalData } from '@/utils/environmentalDataAPI';
-import { checkTriggerSimilarity, RiskAssessment, fetchUserTriggerHistory } from '@/utils/riskAssessment';
+import { checkTriggerSimilarity, RiskAssessment } from '@/utils/riskAssessment';
 
 export default function PredictiveRiskAlert() {
   const [loading, setLoading] = useState(false);
@@ -37,50 +36,10 @@ export default function PredictiveRiskAlert() {
   const [lastCheckTime, setLastCheckTime] = useState<Date | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [triggerCount, setTriggerCount] = useState(0);
 
   useEffect(() => {
-    initializeComponent();
+    checkPermissions();
   }, []);
-
-  /**
-   * Initialize component - load saved state and check permissions
-   */
-  const initializeComponent = async () => {
-    await checkPermissions();
-    await loadSavedState();
-    await loadTriggerCount();
-  };
-
-  /**
-   * Load saved monitoring state from storage
-   */
-  const loadSavedState = async () => {
-    try {
-      const savedState = await AsyncStorage.getItem('risk_monitor_enabled');
-      if (savedState === 'true') {
-        setMonitoringEnabled(true);
-      }
-    } catch (error) {
-      console.error('Error loading saved state:', error);
-    }
-  };
-
-  /**
-   * Load user's trigger count
-   */
-  const loadTriggerCount = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const triggers = await fetchUserTriggerHistory(user.id, 100);
-        setTriggerCount(triggers.length);
-        console.log(`Found ${triggers.length} triggers in history`);
-      }
-    } catch (error) {
-      console.error('Error loading trigger count:', error);
-    }
-  };
 
   /**
    * Check if we have necessary permissions
@@ -195,16 +154,12 @@ export default function PredictiveRiskAlert() {
       );
     } else if (assessment.matchedTriggers.length === 0) {
       Alert.alert(
-        '📊 No Past Triggers Found',
-        `You have ${triggerCount} trigger(s) recorded, but none match current conditions closely.\n\n` +
-        `Current Air Quality:\n` +
-        `• AQI: ${envData.aqi} (${getAQIInfo(envData.aqi).category})\n` +
-        `• Temperature: ${envData.temperature.toFixed(1)}°C\n` +
-        `• Humidity: ${envData.humidity}%\n` +
-        `• Pollen: ${envData.pollenLevel}\n\n` +
-        (triggerCount === 0 
-          ? '💡 Start recording triggers on the map to get personalized alerts!'
-          : '✅ Conditions look different from your past triggers.'),
+        '📊 No Trigger History',
+        `Start recording your asthma triggers on the map to get personalized risk alerts!\n\n` +
+        `Current Conditions:\n` +
+        `AQI: ${envData.aqi}\n` +
+        `Temperature: ${envData.temperature}°C\n` +
+        `Humidity: ${envData.humidity}%`,
         [{ text: 'Got It' }]
       );
     } else {
@@ -235,19 +190,17 @@ export default function PredictiveRiskAlert() {
         return;
       }
       
-      // Save state and perform first check
-      setMonitoringEnabled(true);
-      await AsyncStorage.setItem('risk_monitor_enabled', 'true');
+      // Perform first check
       await checkCurrentRisk();
+      setMonitoringEnabled(true);
       
       Alert.alert(
-        'Monitoring Enabled ✅',
-        'QAir will check your asthma risk automatically as you move around.\n\nYour monitoring preference is saved and will persist.',
+        'Monitoring Enabled',
+        'QAir will check your asthma risk automatically as you move around.',
         [{ text: 'Great!' }]
       );
     } else {
       setMonitoringEnabled(false);
-      await AsyncStorage.setItem('risk_monitor_enabled', 'false');
       Alert.alert(
         'Monitoring Disabled', 
         'Automatic risk checking has been turned off.',
@@ -285,23 +238,12 @@ export default function PredictiveRiskAlert() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View className="bg-indigo-600 p-6 pb-8 rounded-b-3xl">
-          <View className="flex-row items-center justify-between mb-2">
-            <View className="flex-row items-center flex-1">
-              <Ionicons name="shield-checkmark" size={32} color="white" />
-              <Text className="text-white text-2xl font-bold ml-3">Risk Monitor</Text>
-            </View>
-            {triggerCount > 0 && (
-              <View className="bg-white/20 px-3 py-1 rounded-full">
-                <Text className="text-white text-xs font-semibold">
-                  {triggerCount} trigger{triggerCount !== 1 ? 's' : ''}
-                </Text>
-              </View>
-            )}
+          <View className="flex-row items-center mb-2">
+            <Ionicons name="shield-checkmark" size={32} color="white" />
+            <Text className="text-white text-2xl font-bold ml-3">Risk Monitor</Text>
           </View>
           <Text className="text-indigo-100 text-sm">
-            {triggerCount === 0 
-              ? 'Record triggers on the map to get personalized alerts'
-              : `Analyzing ${triggerCount} past trigger${triggerCount !== 1 ? 's' : ''} for risk prediction`}
+            Predictive alerts based on your trigger history
           </Text>
         </View>
 
