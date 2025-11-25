@@ -15,6 +15,9 @@ import { Calendar } from 'react-native-calendars';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/utils/supabase';
 import BluetoothManager from '@/components/BluetoothManager';
+import EmergencyContactsManager from '@/components/EmergencyContactsManager';
+import AsthmaActionPlanManager from '@/components/AsthmaActionPlanManager';
+import { generateAndShareReport } from '@/utils/reportGenerator';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -60,6 +63,7 @@ export default function ProfilePage() {
   const [totalTriggers, setTotalTriggers] = useState(0);
   const [avgAqi, setAvgAqi] = useState(0);
   const [showAllPlaces, setShowAllPlaces] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -308,6 +312,42 @@ export default function ProfilePage() {
         },
       ]
     );
+  };
+
+  const handleExportReport = async () => {
+    try {
+      setGeneratingReport(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Login Required', 'Please log in again to export your report.');
+        return;
+      }
+      
+      // Check if user has any triggers
+      const { data: triggers, error } = await supabase
+        .from('inhaler_triggers')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!triggers || triggers.length === 0) {
+        Alert.alert('No Data', 'You don\'t have any recorded triggers yet.');
+        setGeneratingReport(false);
+        return;
+      }
+
+      // Generate and share the report
+      await generateAndShareReport(user.id, userName || 'User');
+      
+    } catch (error) {
+      console.error('Error generating report:', error);
+      Alert.alert('Error', 'Failed to generate report. Please try again.');
+    } finally {
+      setGeneratingReport(false);
+    }
   };
 
   const handleSettings = () => {
@@ -761,10 +801,51 @@ export default function ProfilePage() {
           )}
         </View>
 
+        {/* Emergency Settings Section */}
+        <View className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 mx-5 mt-5">
+          <View className="flex-row items-center mb-2">
+            <View className="bg-red-500 w-10 h-10 rounded-full items-center justify-center">
+              <Ionicons name="warning" size={24} color="white" />
+            </View>
+            <Text className="text-red-900 font-bold text-2xl ml-3">Emergency Setup</Text>
+          </View>
+          <Text className="text-red-700 text-sm">
+            Configure emergency contacts and action plan for the SOS button
+          </Text>
+        </View>
+
+        {/* Emergency Contacts Manager */}
+        <View className="mx-5 mt-5">
+          <EmergencyContactsManager />
+        </View>
+
+        {/* Asthma Action Plan Manager */}
+        <View className="mx-5 mt-5">
+          <AsthmaActionPlanManager />
+        </View>
+
+        {/* Export Report Button */}
+        <TouchableOpacity
+          onPress={handleExportReport}
+          disabled={generatingReport}
+          className="bg-indigo-600 mx-5 mt-5 rounded-2xl p-5 shadow-md"
+          style={{ elevation: 4, opacity: generatingReport ? 0.6 : 1 }}>
+          <View className="flex-row items-center justify-center">
+            {generatingReport ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Ionicons name="document-text" size={24} color="white" />
+            )}
+            <Text className="text-white font-bold text-lg ml-3">
+              {generatingReport ? 'Generating...' : 'Export Report (PDF)'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
         {/* Logout Button */}
         <TouchableOpacity
           onPress={handleLogout}
-          className="bg-red-500 mx-5 mt-5 mb-8 rounded-2xl p-5 shadow-md"
+          className="bg-red-500 mx-5 mt-5 mb-32 rounded-2xl p-5 shadow-md"
           style={{ elevation: 4 }}>
           <View className="flex-row items-center justify-center">
             <Ionicons name="log-out-outline" size={24} color="white" />

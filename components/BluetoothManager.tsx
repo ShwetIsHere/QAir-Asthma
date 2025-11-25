@@ -14,6 +14,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
+import { supabase } from '@/utils/supabase';
+import { fetchAirQuality } from '@/utils/airQuality';
 
 // Lazy import BLE Manager to avoid initialization errors in Expo Go
 let BleManager: any = null;
@@ -46,13 +49,15 @@ type BluetoothDevice = {
 type BluetoothManagerProps = {
   onDeviceConnected?: (device: BluetoothDevice) => void;
   onDeviceDisconnected?: () => void;
+  onTriggerRecorded?: () => void; // Callback when inhaler trigger is recorded
 };
 
 // BLE manager will be initialized lazily via initializeBLE()
 
 export default function BluetoothManager({ 
   onDeviceConnected, 
-  onDeviceDisconnected 
+  onDeviceDisconnected,
+  onTriggerRecorded
 }: BluetoothManagerProps) {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -60,6 +65,7 @@ export default function BluetoothManager({
   const [availableDevices, setAvailableDevices] = useState<BluetoothDevice[]>([]);
   const [bluetoothEnabled, setBluetoothEnabled] = useState(false);
   const [checkingBluetooth, setCheckingBluetooth] = useState(false);
+  const [bleDataBuffer, setBleDataBuffer] = useState<string>(''); // Buffer for incomplete BLE data
 
   // Debug: Log when available devices change
   useEffect(() => {
@@ -362,6 +368,60 @@ export default function BluetoothManager({
       await connectedBleDevice.discoverAllServicesAndCharacteristics();
       console.log('Services discovered');
       
+      // Monitor ESP32 Inhaler Triggers
+      if (device.name === 'QAir-Inhaler' || device.name?.includes('QAir')) {
+        console.log('🔵 Setting up ESP32 inhaler monitoring...');
+        console.log('🔵 Service UUID: 4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+        console.log('🔵 Characteristic UUID: beb5483e-36e1-4688-b7f5-ea07361b26a8');
+        
+        connectedBleDevice.monitorCharacteristicForService(
+          '4fafc201-1fb5-459e-8fcc-c5c9c331914b', // SERVICE_UUID
+          'beb5483e-36e1-4688-b7f5-ea07361b26a8', // TRIGGER_CHAR_UUID
+          async (error: any, characteristic: any) => {
+            console.log('🔵 BLE notification callback triggered!');
+            
+            if (error) {
+              console.error('❌ BLE monitoring error:', error);
+              return;
+            }
+            
+            if (characteristic?.value) {
+              try {
+                // Decode base64 BLE data
+                const base64Data = characteristic.value;
+                const decodedData = atob(base64Data);
+                
+                console.log('📨 ESP32 data received:', decodedData);
+                
+                // Parse short format: "T,fsrValue,count" (e.g., "T,856,1")
+                const parts = decodedData.split(',');
+                
+                if (parts[0] === 'T' && parts.length === 3) {
+                  const triggerData = {
+                    event: 'trigger',
+                    fsrValue: parseInt(parts[1]),
+                    count: parseInt(parts[2])
+                  };
+                  
+                  console.log('✅ ESP32 Trigger parsed:', triggerData);
+                  
+                  // Record trigger with location and air quality
+                  await recordInhalerTrigger(triggerData);
+                } else {
+                  console.warn('⚠️ Unknown BLE data format:', decodedData);
+                }
+              } catch (e) {
+                console.error('❌ Error processing BLE data:', e);
+              }
+            } else {
+              console.warn('⚠️ BLE notification received but no value');
+            }
+          }
+        );
+        
+        console.log('✅ Monitoring active for inhaler triggers');
+      }
+      
       const connectedDeviceData: BluetoothDevice = {
         ...device,
         isConnected: true,
@@ -388,6 +448,74 @@ export default function BluetoothManager({
         `Could not connect to ${device.name}. Please make sure the device is in pairing mode and try again.`,
         [{ text: 'OK' }]
       );
+    }
+  };
+
+  // Record inhaler trigger in Supabase with location and air quality
+  const recordInhalerTrigger = async (triggerData: any) => {
+    try {
+      console.log('Recording inhaler trigger...');
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No user logged in');
+        Alert.alert('Error', 'Please log in to record inhaler usage');
+        return;
+      }
+      
+      // Get GPS location
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.error('Location permission denied');
+        Alert.alert('Permission Required', 'Please enable location to record inhaler usage');
+        return;
+      }
+      
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+      
+      console.log('Location:', latitude, longitude);
+      
+      // Fetch air quality data
+      const airQuality = await fetchAirQuality(latitude, longitude);
+      console.log('Air quality:', airQuality.aqi);
+      
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from('inhaler_triggers')
+        .insert({
+          user_id: user.id,
+          latitude,
+          longitude,
+          timestamp: new Date().toISOString(),
+          aqi: airQuality.aqi,
+          category: airQuality.category,
+          pm25: airQuality.pm25,
+          pm10: airQuality.pm10,
+          temperature: airQuality.temperature,
+          humidity: airQuality.humidity,
+        });
+      
+      if (error) {
+        console.error('Supabase insert error:', error);
+        Alert.alert('Error', 'Failed to record inhaler usage');
+        return;
+      }
+      
+      console.log('✓ Trigger recorded in Supabase');
+      Alert.alert(
+        'Inhaler Use Recorded',
+        `Trigger #${triggerData.count} recorded at ${airQuality.category} air quality (AQI: ${airQuality.aqi})`
+      );
+      
+      // Notify parent component to refresh dashboard
+      if (onTriggerRecorded) {
+        onTriggerRecorded();
+      }
+    } catch (error) {
+      console.error('Error recording trigger:', error);
+      Alert.alert('Error', 'Failed to record inhaler usage');
     }
   };
 

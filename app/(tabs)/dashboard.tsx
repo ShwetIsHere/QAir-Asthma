@@ -11,6 +11,10 @@ import { AQICard } from '@/components/AQICard';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { fetchAirQuality } from '@/utils/airQuality';
 import BluetoothManager from '@/components/BluetoothManager';
+import SOSButton, { sendAutoEmergencySMS } from '@/components/SOSButton';
+import TestPredictiveRiskAPIs from '@/components/TestPredictiveRiskAPIs';
+import PredictiveRiskAlert from '@/components/PredictiveRiskAlert';
+import { sendRedZoneAlert } from '@/utils/notificationService';
 
 type InhalerTrigger = {
   id: string;
@@ -38,6 +42,7 @@ type Hospital = {
   longitude: number;
   vicinity?: string;
   distance?: number;
+  type: 'hospital' | 'pharmacy';
 };
 
 export default function Dashboard() {
@@ -51,8 +56,27 @@ export default function Dashboard() {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [showingHospitals, setShowingHospitals] = useState(false);
   const [loadingHospitals, setLoadingHospitals] = useState(false);
+  const [testApisModalVisible, setTestApisModalVisible] = useState(false);
+  const [riskMonitorModalVisible, setRiskMonitorModalVisible] = useState(false);
+  const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
+  const [directionModalVisible, setDirectionModalVisible] = useState(false);
   const mapRef = useRef<MapView>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
+  const lastRedZoneAlertRef = useRef<{ zoneId: string; timestamp: number } | null>(null);
+  const RED_ZONE_RADIUS_METERS = 500;
+  const RED_ZONE_ALERT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+  // Debug: Monitor hospitals state changes
+  useEffect(() => {
+    console.log('🔄 STATE CHANGE - hospitals:', hospitals.length, 'showingHospitals:', showingHospitals, 'loadingHospitals:', loadingHospitals);
+    if (hospitals.length > 0) {
+      console.log('🏥 Hospitals in state:', hospitals.map(h => ({ name: h.name, lat: h.latitude, lng: h.longitude })));
+    }
+  }, [hospitals, showingHospitals, loadingHospitals]);
+
+  useEffect(() => {
+    console.log('🏥 Hospitals state changed:', hospitals.length, 'Showing:', showingHospitals);
+  }, [hospitals, showingHospitals]);
 
   useEffect(() => {
     let isMounted = true;
@@ -76,6 +100,36 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    let subscription: Location.LocationSubscription | null = null;
+
+    const startLocationWatch = async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        return;
+      }
+
+      subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          distanceInterval: 50,
+          timeInterval: 60 * 1000,
+        },
+        (newLocation) => {
+          setLocation(newLocation);
+        }
+      );
+    };
+
+    startLocationWatch();
+
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     calculateRedZones();
     
     return () => {
@@ -83,6 +137,12 @@ export default function Dashboard() {
       setRedZones([]);
     };
   }, [triggers]);
+
+  useEffect(() => {
+    if (location) {
+      checkRedZoneProximity(location);
+    }
+  }, [location, redZones]);
 
   const initializeLocation = async () => {
     try {
@@ -196,6 +256,30 @@ export default function Dashboard() {
     return R * c;
   };
 
+  const checkRedZoneProximity = (currentLocation: Location.LocationObject) => {
+    if (!currentLocation || redZones.length === 0) return;
+
+    const { latitude, longitude } = currentLocation.coords;
+
+    const activeZone = redZones.find((zone) => {
+      const distance = getDistance(latitude, longitude, zone.latitude, zone.longitude);
+      return distance <= RED_ZONE_RADIUS_METERS;
+    });
+
+    if (activeZone) {
+      const zoneId = `${activeZone.latitude.toFixed(4)}-${activeZone.longitude.toFixed(4)}`;
+      const now = Date.now();
+      const lastAlert = lastRedZoneAlertRef.current;
+
+      if (!lastAlert || lastAlert.zoneId !== zoneId || now - lastAlert.timestamp > RED_ZONE_ALERT_COOLDOWN_MS) {
+        lastRedZoneAlertRef.current = { zoneId, timestamp: now };
+        sendRedZoneAlert(activeZone.count).catch((error) => console.error('Failed to send red zone alert', error));
+      }
+    } else {
+      lastRedZoneAlertRef.current = null;
+    }
+  };
+
   const handleAddTrigger = async () => {
     if (!location) {
       Alert.alert('Error', 'Location not available');
@@ -232,8 +316,11 @@ export default function Dashboard() {
       if (error) {
         Alert.alert('Error', 'Failed to record trigger');
       } else {
-        Alert.alert('Success', 'Inhaler trigger recorded');
+        Alert.alert('✅ Trigger Recorded', 'Inhaler use recorded. Sending emergency alert to contacts...');
         loadTriggers();
+        
+        // Automatically send SOS to emergency contacts
+        await sendAutoEmergencySMS();
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to record trigger');
@@ -272,20 +359,22 @@ export default function Dashboard() {
   };
 
   const fetchNearbyHospitals = async () => {
+    console.log('🏥 fetchNearbyHospitals called');
+    
     if (!location) {
+      console.log('❌ No location available');
       Alert.alert('Error', 'Location not available');
       return;
     }
 
-    setLoadingHospitals(true);
-
     try {
-      // Use OpenStreetMap Overpass API (completely free, no API key needed)
-      const radius = 5000; // 5km radius
+      const radius = 5000;
       const lat = location.coords.latitude;
       const lon = location.coords.longitude;
 
-      // Overpass QL query to find hospitals
+      console.log('📍 Location:', lat, lon);
+      console.log('🌐 Fetching from OpenStreetMap...');
+      
       const query = `
         [out:json][timeout:25];
         (
@@ -297,82 +386,107 @@ export default function Dashboard() {
         out center;
       `;
 
-      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-      
-      console.log('Fetching hospitals from OpenStreetMap...');
-      
+      const url = `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`;
+      console.log('📡 Fetching from URL...');
       const response = await fetch(url);
+      console.log('✅ Response received, status:', response.status);
+      
       const data = await response.json();
-
-      console.log('OSM Response:', data);
+      console.log('📦 Data parsed, elements:', data.elements?.length || 0);
 
       if (data.elements && data.elements.length > 0) {
-        const hospitalData: Hospital[] = data.elements.map((element: any, index: number) => {
-          const hospitalLat = element.lat || element.center?.lat;
-          const hospitalLon = element.lon || element.center?.lon;
-          
-          return {
-            id: element.id?.toString() || `hospital-${index}`,
-            name: element.tags?.name || element.tags?.['name:en'] || 'Unnamed Hospital/Clinic',
-            latitude: hospitalLat,
-            longitude: hospitalLon,
-            vicinity: element.tags?.['addr:street'] || element.tags?.['addr:city'] || '',
-            distance: getDistance(lat, lon, hospitalLat, hospitalLon),
-          };
-        }).filter((h: Hospital) => h.latitude && h.longitude);
+        console.log('🔍 Processing hospital data...');
+        const hospitalList = data.elements
+          .map((element: any) => {
+            const hospitalLat = element.lat || element.center?.lat;
+            const hospitalLon = element.lon || element.center?.lon;
+            
+            if (!hospitalLat || !hospitalLon) return null;
+            
+            return {
+              id: element.id?.toString() || `hospital-${Math.random()}`,
+              name: element.tags?.name || 'Unnamed Hospital',
+              latitude: hospitalLat,
+              longitude: hospitalLon,
+              vicinity: element.tags?.['addr:street'] || '',
+              distance: getDistance(lat, lon, hospitalLat, hospitalLon),
+              type: 'hospital' as const,
+            };
+          })
+          .filter((h: any) => h !== null)
+          .sort((a: any, b: any) => a.distance - b.distance)
+          .slice(0, 5);
 
-        // Sort by distance and take only top 5
-        hospitalData.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-        const topHospitals = hospitalData.slice(0, 5);
-
-        console.log('Found hospitals:', topHospitals.length);
-
-        setHospitals(topHospitals);
+        console.log('✨ Hospital list created:', hospitalList.length, 'hospitals');
+        console.log('Hospital details:', JSON.stringify(hospitalList, null, 2));
+        
+        console.log('💾 Setting hospitals state...');
+        setHospitals(hospitalList);
+        
+        console.log('👁️ Setting showingHospitals to true...');
         setShowingHospitals(true);
 
-        // Zoom out to show hospitals
-        if (mapRef.current && topHospitals.length > 0) {
+        if (mapRef.current) {
+          console.log('🗺️ Animating map region...');
           mapRef.current.animateToRegion({
             latitude: lat,
             longitude: lon,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
           }, 1000);
         }
 
-        Alert.alert(
-          'Nearest Hospitals',
-          `Showing ${topHospitals.length} nearest medical facilities`,
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Success', `Found ${hospitalList.length} nearest hospitals`);
+        console.log('✅ fetchNearbyHospitals completed successfully');
       } else {
-        Alert.alert('No Results', 'No hospitals or clinics found within 5km radius. This area may not have detailed map data.');
+        console.log('⚠️ No hospital elements found');
+        Alert.alert('No Results', 'No hospitals found nearby');
       }
-    } catch (error) {
-      console.error('Error fetching hospitals:', error);
-      Alert.alert('Error', 'Failed to fetch nearby hospitals. Please check your internet connection.');
+    } catch (error: any) {
+      console.error('❌ Error in fetchNearbyHospitals:', error);
+      Alert.alert('Error', 'Failed to fetch hospitals');
     } finally {
+      console.log('🏁 Setting loadingHospitals to false');
       setLoadingHospitals(false);
     }
   };
 
-  const toggleHospitals = () => {
+  const toggleHospitals = async () => {
+    console.log('🔘 Toggle button pressed');
+    console.log('Current state - loadingHospitals:', loadingHospitals, 'showingHospitals:', showingHospitals, 'hospitals.length:', hospitals.length);
+    
+    if (loadingHospitals) {
+      console.log('⏳ Already loading, ignoring...');
+      return;
+    }
+
     if (showingHospitals) {
+      console.log('👻 Hiding hospitals');
       setHospitals([]);
       setShowingHospitals(false);
     } else {
-      fetchNearbyHospitals();
+      console.log('👀 Showing hospitals - starting fetch...');
+      setLoadingHospitals(true);
+      await fetchNearbyHospitals();
+      console.log('✅ Fetch complete, final state - hospitals.length:', hospitals.length, 'showingHospitals:', showingHospitals);
     }
   };
 
   const openDirections = (hospital: Hospital) => {
+    setSelectedHospital(hospital);
+    setDirectionModalVisible(true);
+  };
+
+  const navigateToHospital = () => {
+    if (!selectedHospital) return;
+
     const scheme = Platform.select({
       ios: 'maps:',
       android: 'geo:',
     });
     
-    const latLng = `${hospital.latitude},${hospital.longitude}`;
-    const label = encodeURIComponent(hospital.name);
+    const latLng = `${selectedHospital.latitude},${selectedHospital.longitude}`;
+    const label = encodeURIComponent(selectedHospital.name);
     
     const url = Platform.select({
       ios: `${scheme}?daddr=${latLng}&dirflg=d`,
@@ -383,10 +497,12 @@ export default function Dashboard() {
       Linking.canOpenURL(url).then((supported) => {
         if (supported) {
           Linking.openURL(url);
+          setDirectionModalVisible(false);
         } else {
           // Fallback to Google Maps web
-          const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latLng}&destination_place_id=${hospital.name}`;
+          const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latLng}&destination_place_id=${selectedHospital.name}`;
           Linking.openURL(googleMapsUrl);
+          setDirectionModalVisible(false);
         }
       });
     }
@@ -446,7 +562,7 @@ export default function Dashboard() {
             showsPointsOfInterest={true}
             showsBuildings={true}
             showsTraffic={false}
-            mapPadding={{ top: 0, right: 0, bottom: 120, left: 0 }}>
+            mapPadding={{ top: 0, right: 0, bottom: 350, left: 0 }}>
             {/* Inhaler Trigger Markers */}
             {triggers.map((trigger) => (
               <Marker
@@ -479,54 +595,48 @@ export default function Dashboard() {
             ))}
 
             {/* Hospital Markers */}
-            {hospitals.map((hospital) => (
+            {showingHospitals && hospitals.map((facility) => {
+              console.log('🏥 Rendering marker for:', facility.name, 'at', facility.latitude, facility.longitude);
+              return (
               <Marker
-                key={hospital.id}
+                key={facility.id}
                 coordinate={{
-                  latitude: hospital.latitude,
-                  longitude: hospital.longitude,
+                  latitude: facility.latitude,
+                  longitude: facility.longitude,
                 }}
-                title={hospital.name}
-                description={`${hospital.vicinity || ''} - ${((hospital.distance || 0) / 1000).toFixed(2)} km away`}>
-                <View className="bg-green-500 w-12 h-12 rounded-full items-center justify-center border-3 border-white shadow-xl"
-                  style={{ elevation: 8 }}>
-                  <Ionicons name="medical" size={24} color="white" />
-                </View>
-                <Callout onPress={() => openDirections(hospital)}>
-                  <View style={{ width: 200, padding: 10 }}>
-                    <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 5 }}>
-                      {hospital.name}
-                    </Text>
-                    {hospital.vicinity && (
-                      <Text style={{ fontSize: 12, color: '#666', marginBottom: 5 }}>
-                        {hospital.vicinity}
-                      </Text>
-                    )}
-                    <Text style={{ fontSize: 12, color: '#6366F1', marginBottom: 8 }}>
-                      {((hospital.distance || 0) / 1000).toFixed(2)} km away
-                    </Text>
-                    <View style={{ 
-                      backgroundColor: '#6366F1', 
-                      padding: 8, 
-                      borderRadius: 8, 
-                      alignItems: 'center',
-                      flexDirection: 'row',
-                      justifyContent: 'center'
-                    }}>
-                      <Ionicons name="navigate" size={16} color="white" />
-                      <Text style={{ color: 'white', fontWeight: 'bold', marginLeft: 5 }}>
-                        Get Directions
-                      </Text>
-                    </View>
-                  </View>
-                </Callout>
-              </Marker>
-            ))}
+                pinColor="#3B82F6"
+                title={facility.name}
+                description={`${((facility.distance || 0) / 1000).toFixed(2)} km away`}
+                onPress={() => openDirections(facility)}
+              />
+            );
+            })}
           </MapView>
         )}
 
         {/* Floating Action Buttons */}
-        <View className="absolute right-6 bottom-32 space-y-3">
+        <View className="absolute right-6 bottom-64 space-y-3">
+          {/* SOS Button */}
+          <SOSButton />
+          
+          <View className="h-4" />
+          
+          {/* Risk Monitor Button */}
+          <TouchableOpacity
+            onPress={() => setRiskMonitorModalVisible(true)}
+            className="bg-yellow-500 w-16 h-16 rounded-full items-center justify-center shadow-2xl"
+            style={{ elevation: 8 }}>
+            <Ionicons name="shield-checkmark" size={32} color="white" />
+          </TouchableOpacity>
+          
+          {/* API Test Button */}
+          <TouchableOpacity
+            onPress={() => setTestApisModalVisible(true)}
+            className="bg-purple-500 w-16 h-16 rounded-full items-center justify-center shadow-2xl"
+            style={{ elevation: 8 }}>
+            <Ionicons name="flask" size={32} color="white" />
+          </TouchableOpacity>
+          
           <TouchableOpacity
             onPress={toggleHospitals}
             className={`${showingHospitals ? 'bg-green-500' : 'bg-white'} w-16 h-16 rounded-full items-center justify-center shadow-2xl mb-3`}
@@ -551,7 +661,7 @@ export default function Dashboard() {
         </View>
 
         {/* Add Trigger Button */}
-        <View className="absolute bottom-28 self-center">
+        <View className="absolute bottom-60 self-center">
           <TouchableOpacity
             onPress={handleAddTrigger}
             className="bg-red-500 px-10 py-5 rounded-full flex-row items-center shadow-2xl"
@@ -617,6 +727,106 @@ export default function Dashboard() {
                   console.log('Device disconnected');
                 }}
               />
+            </View>
+          </View>
+        </Modal>
+
+        {/* API Test Modal */}
+        <Modal
+          visible={testApisModalVisible}
+          animationType="slide"
+          onRequestClose={() => setTestApisModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>API Test Suite</Text>
+              <TouchableOpacity
+                onPress={() => setTestApisModalVisible(false)}
+                style={styles.closeButton}>
+                <Ionicons name="close-circle" size={32} color="#6366F1" />
+              </TouchableOpacity>
+            </View>
+            <TestPredictiveRiskAPIs />
+          </View>
+        </Modal>
+
+        {/* Risk Monitor Modal */}
+        <Modal
+          visible={riskMonitorModalVisible}
+          animationType="slide"
+          onRequestClose={() => setRiskMonitorModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Risk Monitor</Text>
+              <TouchableOpacity
+                onPress={() => setRiskMonitorModalVisible(false)}
+                style={styles.closeButton}>
+                <Ionicons name="close-circle" size={32} color="#6366F1" />
+              </TouchableOpacity>
+            </View>
+            <PredictiveRiskAlert />
+          </View>
+        </Modal>
+
+        {/* Direction Modal - Centered */}
+        <Modal
+          visible={directionModalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setDirectionModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContainer, { maxHeight: 'auto', padding: 24 }]}>
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <View 
+                  className="bg-blue-500 w-20 h-20 rounded-full items-center justify-center mb-4"
+                  style={{ elevation: 8 }}>
+                  <Text style={{ fontSize: 32, fontWeight: 'bold', color: 'white' }}>
+                    H
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1F2937', textAlign: 'center', marginBottom: 8 }}>
+                  {selectedHospital?.name}
+                </Text>
+                {selectedHospital?.vicinity && (
+                  <Text style={{ fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 8 }}>
+                    {selectedHospital.vicinity}
+                  </Text>
+                )}
+                <Text style={{ fontSize: 16, color: '#6366F1', fontWeight: '600' }}>
+                  {((selectedHospital?.distance || 0) / 1000).toFixed(2)} km away
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={navigateToHospital}
+                style={{
+                  backgroundColor: '#6366F1',
+                  paddingVertical: 16,
+                  paddingHorizontal: 32,
+                  borderRadius: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 12,
+                }}>
+                <Ionicons name="navigate" size={24} color="white" />
+                <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 8 }}>
+                  Get Directions
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setDirectionModalVisible(false)}
+                style={{
+                  backgroundColor: '#E5E7EB',
+                  paddingVertical: 12,
+                  paddingHorizontal: 32,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                }}>
+                <Text style={{ color: '#4B5563', fontSize: 16, fontWeight: '600' }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
