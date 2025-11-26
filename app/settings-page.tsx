@@ -7,16 +7,11 @@ import {
   Switch,
   Alert,
   Linking,
-  Share,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Paths, File } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { supabase } from '@/utils/supabase';
-import { generateHealthReport } from '@/utils/pdfGenerator';
 
 const APP_VERSION = '1.0.0';
 
@@ -71,79 +66,6 @@ export default function SettingsPage() {
     Alert.alert('Dark Mode', value ? 'Dark mode will be available in the next update!' : 'Light mode enabled');
   };
 
-  const handleExportData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        Alert.alert('Error', 'You must be logged in to export data');
-        return;
-      }
-
-      try {
-        Alert.alert('Generating Report', 'Please wait while we create your comprehensive health report with AI insights...');
-
-        // Fetch all user triggers
-        const { data: triggers, error } = await supabase
-          .from('inhaler_triggers')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('timestamp', { ascending: false });
-
-        if (error) throw error;
-
-        if (!triggers || triggers.length === 0) {
-          Alert.alert('No Data', 'You don\'t have any trigger data to export yet.');
-          return;
-        }
-
-        // Calculate stats
-        const validAqi = triggers.filter(t => t.aqi).map(t => t.aqi!);
-        const avgAqi = validAqi.length > 0 
-          ? Math.round(validAqi.reduce((sum, aqi) => sum + aqi, 0) / validAqi.length)
-          : 0;
-
-        const firstDate = new Date(triggers[triggers.length - 1].timestamp);
-        const lastDate = new Date(triggers[0].timestamp);
-        const dateRange = `${firstDate.toLocaleDateString()} - ${lastDate.toLocaleDateString()}`;
-
-        // Get user info
-        const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
-        const userEmail = user.email || 'No email';
-
-        // Get OpenRouter API key
-        const openRouterApiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
-
-        // Generate PDF
-        await generateHealthReport({
-          userName,
-          userEmail,
-          triggers,
-          totalTriggers: triggers.length,
-          avgAqi,
-          dateRange,
-        }, openRouterApiKey);
-
-        Alert.alert('Success', 'Health report generated and ready to share!');
-      } catch (error: any) {
-        console.error('PDF generation error:', error);
-        
-        // Check if it's the specific Expo Go limitation error
-        if (error?.message?.includes('development build')) {
-          // Error already shown by pdfGenerator, just return
-          return;
-        }
-        
-        Alert.alert(
-          'Error', 
-          'Failed to generate PDF report. Please try again or use a development build for full PDF support.'
-        );
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert('Error', 'Failed to export data. Please try again.');
-    }
-  };
-
   const handleClearCache = async () => {
     Alert.alert(
       'Clear Cache & Restart',
@@ -193,7 +115,7 @@ export default function SettingsPage() {
           text: 'FAQ',
           onPress: () => Alert.alert(
             'Frequently Asked Questions',
-            '1. How does the app work?\nThe app tracks your inhaler usage and correlates it with air quality data.\n\n2. Is my data private?\nYes, all data is encrypted and stored securely.\n\n3. How accurate is the AQI?\nWe use real-time data from reliable sources.\n\n4. Can I export my data?\nYes, use the Export Data option in Settings.'
+            '1. How does the app work?\nThe app tracks your inhaler usage and correlates it with air quality data.\n\n2. Is my data private?\nYes, all data is encrypted and stored securely.\n\n3. How accurate is the AQI?\nWe use real-time data from reliable sources.\n\n4. Can I export my data?\nYes, tap the Export Report button in your Profile tab.'
           ),
         },
         {
@@ -382,12 +304,6 @@ export default function SettingsPage() {
 
           {/* Data Management Section */}
           <SettingSection title="Data Management">
-            <SettingItem
-              icon="download"
-              title="Export Data"
-              subtitle="Download your trigger history"
-              onPress={handleExportData}
-            />
             <SettingItem
               icon="trash"
               title="Clear Cache"

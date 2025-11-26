@@ -10,6 +10,7 @@ type TriggerData = {
   aqi?: number;
   category?: string;
   pm25?: number;
+  pm10?: number;
   temperature?: number;
   humidity?: number;
   wind_speed?: number;
@@ -114,6 +115,62 @@ const analyzeAQIDistribution = (triggers: TriggerData[]) => {
   });
   
   return distribution;
+};
+
+const buildTriggerTableRows = (triggers: TriggerData[]) => {
+  return triggers
+    .map((trigger, index) => {
+      const date = new Date(trigger.timestamp);
+      return `
+        <tr>
+          <td>${index + 1}</td>
+          <td>
+            ${date.toLocaleDateString()}<br />
+            <span>${date.toLocaleTimeString()}</span>
+          </td>
+          <td>
+            <span style="color: ${getAQIColor(trigger.aqi || 0)}; font-weight: 600;">
+              ${trigger.aqi ?? 'N/A'}
+            </span>
+            <div>${getAQICategory(trigger.aqi || 0)}</div>
+          </td>
+          <td>${trigger.temperature?.toFixed(1) ?? 'N/A'}°C</td>
+          <td>${trigger.humidity?.toFixed(0) ?? 'N/A'}%</td>
+          <td>
+            PM2.5: ${trigger.pm25?.toFixed(1) ?? 'N/A'}<br />
+            PM10: ${trigger.pm10?.toFixed(1) ?? 'N/A'}
+          </td>
+        </tr>
+      `;
+    })
+    .join('');
+};
+
+const generateTriggerTableSection = (triggers: TriggerData[]) => {
+  if (!triggers || triggers.length === 0) return '';
+
+  return `
+    <div class="section">
+      <h2 class="section-title">📋 Detailed Trigger Log</h2>
+      <div class="table-wrapper">
+        <table class="trigger-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date & Time</th>
+              <th>AQI</th>
+              <th>Temperature</th>
+              <th>Humidity</th>
+              <th>Pollutants</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${buildTriggerTableRows(triggers)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 };
 
 const generateAIInsights = async (reportData: ReportData, openRouterApiKey: string): Promise<string> => {
@@ -464,6 +521,39 @@ export const generateHealthReport = async (reportData: ReportData, openRouterApi
           font-weight: bold;
           font-size: 18px;
         }
+        .table-wrapper {
+          overflow-x: auto;
+          background: white;
+          border: 1px solid #E5E7EB;
+          border-radius: 10px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .trigger-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+        }
+        .trigger-table th {
+          text-align: left;
+          padding: 12px;
+          background: #EEF2FF;
+          color: #4B5563;
+          text-transform: uppercase;
+          font-size: 11px;
+          letter-spacing: 0.5px;
+        }
+        .trigger-table td {
+          padding: 12px;
+          border-top: 1px solid #E5E7EB;
+          vertical-align: top;
+        }
+        .trigger-table tbody tr:nth-child(even) {
+          background: #F9FAFB;
+        }
+        .trigger-table td span {
+          color: #6B7280;
+          font-size: 11px;
+        }
       </style>
     </head>
     <body>
@@ -581,6 +671,8 @@ export const generateHealthReport = async (reportData: ReportData, openRouterApi
           <div class="ai-content">${aiInsights}</div>
         </div>
       </div>
+
+      ${generateTriggerTableSection(reportData.triggers)}
 
       <!-- Footer -->
       <div class="footer">

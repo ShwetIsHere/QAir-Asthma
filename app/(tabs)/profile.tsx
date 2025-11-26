@@ -17,7 +17,7 @@ import { supabase } from '@/utils/supabase';
 import BluetoothManager from '@/components/BluetoothManager';
 import EmergencyContactsManager from '@/components/EmergencyContactsManager';
 import AsthmaActionPlanManager from '@/components/AsthmaActionPlanManager';
-import { generateAndShareReport } from '@/utils/reportGenerator';
+import { generateHealthReport } from '@/utils/pdfGenerator';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -26,6 +26,7 @@ type TriggerData = {
   latitude: number;
   longitude: number;
   timestamp: string;
+  created_at?: string;
   aqi?: number;
   category?: string;
   pm25?: number;
@@ -328,7 +329,7 @@ export default function ProfilePage() {
       const { data: triggers, error } = await supabase
         .from('inhaler_triggers')
         .select('*')
-        .eq('user_id', user.id)
+          .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -339,8 +340,28 @@ export default function ProfilePage() {
         return;
       }
 
-      // Generate and share the report
-      await generateAndShareReport(user.id, userName || 'User');
+        const validAqi = triggers.filter(t => t.aqi).map(t => t.aqi!) ?? [];
+        const avgAqi = validAqi.length > 0
+          ? Math.round(validAqi.reduce((sum, value) => sum + value, 0) / validAqi.length)
+          : 0;
+
+        const firstDate = new Date(triggers[triggers.length - 1].created_at || triggers[triggers.length - 1].timestamp);
+        const lastDate = new Date(triggers[0].created_at || triggers[0].timestamp);
+        const dateRange = `${firstDate.toLocaleDateString()} - ${lastDate.toLocaleDateString()}`;
+
+        const displayName = userName || user.user_metadata?.full_name || 'QAir User';
+        const openRouterApiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
+
+        await generateHealthReport({
+          userName: displayName,
+          userEmail: user.email || 'Not provided',
+          triggers,
+          totalTriggers: triggers.length,
+          avgAqi,
+          dateRange,
+        }, openRouterApiKey);
+
+        Alert.alert('Success', 'Your comprehensive PDF report is ready to share.');
       
     } catch (error) {
       console.error('Error generating report:', error);
