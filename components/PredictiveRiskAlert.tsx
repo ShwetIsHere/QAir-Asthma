@@ -188,6 +188,11 @@ export default function PredictiveRiskAlert() {
         console.log('Risk notification suppressed (cooldown active)');
       }
     }
+    // Suppress modal alerts too if within cooldown window
+    const nowTs = Date.now();
+    if (lastNotifyTs && nowTs - lastNotifyTs < 60 * 1000) {
+      return; // Skip showing alert popups repeatedly
+    }
     if (assessment.riskLevel === 'high') {
       Alert.alert(
         '🚨 HIGH ASTHMA RISK ALERT',
@@ -248,6 +253,13 @@ export default function PredictiveRiskAlert() {
 
   const toggleMonitoring = async (enabled: boolean, options?: { silent?: boolean }) => {
     if (enabled) {
+      if (monitoringEnabledRef.current) {
+        // Already monitoring; avoid duplicating interval
+        if (!options?.silent) {
+          Alert.alert('Monitoring Active', 'Risk monitoring is already enabled.');
+        }
+        return;
+      }
       // Request background permissions for continuous monitoring (foreground-only fallback)
       const granted = await requestBackgroundLocationPermission();
       if (!granted) {

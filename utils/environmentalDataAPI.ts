@@ -110,6 +110,11 @@ export const fetchPollenData = async (
   lon: number
 ): Promise<{ pollenCount: number; pollenLevel: 'low' | 'medium' | 'high' | 'very_high' } | null> => {
   try {
+    // If no valid Ambee key, skip external call and return safe defaults
+    if (!AMBEE_API_KEY || AMBEE_API_KEY === 'YOUR_AMBEE_KEY') {
+      // Pollen is optional; avoid noisy errors when key isn't configured
+      return { pollenCount: 0, pollenLevel: 'low' };
+    }
     const response = await axios.get(
       `https://api.ambeedata.com/latest/pollen/by-lat-lng`,
       {
@@ -145,8 +150,18 @@ export const fetchPollenData = async (
     }
 
     return null;
-  } catch (error) {
-    console.error('Error fetching pollen data:', error);
+  } catch (error: any) {
+    // Handle common error codes gracefully without spamming logs
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      console.warn('Pollen API unauthorized; using default values');
+    } else if (status === 422) {
+      console.warn('Pollen API returned 422 (invalid request/params); using default values');
+    } else if (status === 429) {
+      console.warn('Pollen API rate-limited; using default values');
+    } else {
+      console.warn('Pollen API error; using default values');
+    }
     // Return default if Ambee API fails (it's a paid service)
     return {
       pollenCount: 0,

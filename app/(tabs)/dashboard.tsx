@@ -398,95 +398,117 @@ export default function Dashboard() {
 
   const fetchNearbyHospitals = async () => {
     console.log('🏥 fetchNearbyHospitals called');
-    
+
     if (!location) {
       console.log('❌ No location available');
       Alert.alert('Error', 'Location not available');
       return;
     }
 
-    try {
-      const radius = 5000;
-      const lat = location.coords.latitude;
-      const lon = location.coords.longitude;
+    const radius = 5000;
+    const lat = location.coords.latitude;
+    const lon = location.coords.longitude;
+    const overpassEndpoints = [
+      'https://overpass.kumi.systems/api/interpreter',
+      'https://overpass-api.de/api/interpreter',
+      'https://overpass.openstreetmap.ru/cgi/interpreter'
+    ];
 
-      console.log('📍 Location:', lat, lon);
-      console.log('🌐 Fetching from OpenStreetMap...');
-      
-      const query = `
-        [out:json][timeout:25];
-        (
-          node["amenity"="hospital"](around:${radius},${lat},${lon});
-          way["amenity"="hospital"](around:${radius},${lat},${lon});
-          node["amenity"="clinic"](around:${radius},${lat},${lon});
-          way["amenity"="clinic"](around:${radius},${lat},${lon});
-        );
-        out center;
-      `;
+    const query = `
+      [out:json][timeout:25];
+      (
+        node["amenity"="hospital"](around:${radius},${lat},${lon});
+        way["amenity"="hospital"](around:${radius},${lat},${lon});
+        node["amenity"="clinic"](around:${radius},${lat},${lon});
+        way["amenity"="clinic"](around:${radius},${lat},${lon});
+      );
+      out center;
+    `;
 
-      const url = `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`;
-      console.log('📡 Fetching from URL...');
-      const response = await fetch(url);
-      console.log('✅ Response received, status:', response.status);
-      
-      const data = await response.json();
-      console.log('📦 Data parsed, elements:', data.elements?.length || 0);
+    let parsed: any | null = null;
+    let lastError: any = null;
 
-      if (data.elements && data.elements.length > 0) {
-        console.log('🔍 Processing hospital data...');
-        const hospitalList = data.elements
-          .map((element: any) => {
-            const hospitalLat = element.lat || element.center?.lat;
-            const hospitalLon = element.lon || element.center?.lon;
-            
-            if (!hospitalLat || !hospitalLon) return null;
-            
-            return {
-              id: element.id?.toString() || `hospital-${Math.random()}`,
-              name: element.tags?.name || 'Unnamed Hospital',
-              latitude: hospitalLat,
-              longitude: hospitalLon,
-              vicinity: element.tags?.['addr:street'] || '',
-              distance: getDistance(lat, lon, hospitalLat, hospitalLon),
-              type: 'hospital' as const,
-            };
-          })
-          .filter((h: any) => h !== null)
-          .sort((a: any, b: any) => a.distance - b.distance)
-          .slice(0, 5);
-
-        console.log('✨ Hospital list created:', hospitalList.length, 'hospitals');
-        console.log('Hospital details:', JSON.stringify(hospitalList, null, 2));
-        
-        console.log('💾 Setting hospitals state...');
-        setHospitals(hospitalList);
-        
-        console.log('👁️ Setting showingHospitals to true...');
-        setShowingHospitals(true);
-
-        if (mapRef.current) {
-          console.log('🗺️ Animating map region...');
-          mapRef.current.animateToRegion({
-            latitude: lat,
-            longitude: lon,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          }, 1000);
+    for (const endpoint of overpassEndpoints) {
+      const url = `${endpoint}?data=${encodeURIComponent(query)}`;
+      console.log('📡 Trying Overpass endpoint:', endpoint);
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'QAirAsthmaApp/1.0 (contact: support@qair.example)'
+          }
+        });
+        const contentType = response.headers.get('content-type') || '';
+        const text = await response.text();
+        if (!response.ok) {
+          console.warn('⚠️ Non-OK response:', response.status, text.slice(0, 120));
+          lastError = new Error(`Endpoint ${endpoint} returned ${response.status}`);
+          continue;
         }
-
-        Alert.alert('Success', `Found ${hospitalList.length} nearest hospitals`);
-        console.log('✅ fetchNearbyHospitals completed successfully');
-      } else {
-        console.log('⚠️ No hospital elements found');
-        Alert.alert('No Results', 'No hospitals found nearby');
+        if (!contentType.includes('application/json')) {
+          // Likely HTML error page -> skip
+          console.warn('⚠️ Unexpected content-type (expect JSON):', contentType, 'First chars:', text.slice(0, 60));
+          lastError = new Error('Unexpected content type');
+          continue;
+        }
+        try {
+          parsed = JSON.parse(text);
+          break; // success
+        } catch (jsonErr) {
+          console.error('❌ JSON parse failed for endpoint', endpoint, jsonErr);
+          lastError = jsonErr;
+        }
+      } catch (err) {
+        console.error('❌ Fetch error for endpoint', endpoint, err);
+        lastError = err;
+        continue;
       }
-    } catch (error: any) {
-      console.error('❌ Error in fetchNearbyHospitals:', error);
-      Alert.alert('Error', 'Failed to fetch hospitals');
-    } finally {
-      console.log('🏁 Setting loadingHospitals to false');
-      setLoadingHospitals(false);
     }
+
+    if (!parsed) {
+      console.error('❌ All Overpass attempts failed:', lastError);
+      Alert.alert('Error', 'Failed to fetch hospitals (Overpass unavailable). Please try again later.');
+      setLoadingHospitals(false);
+      return;
+    }
+
+    console.log('📦 Data parsed, elements:', parsed.elements?.length || 0);
+    if (parsed.elements && parsed.elements.length > 0) {
+      const hospitalList = parsed.elements
+        .map((element: any) => {
+          const hospitalLat = element.lat || element.center?.lat;
+          const hospitalLon = element.lon || element.center?.lon;
+          if (!hospitalLat || !hospitalLon) return null;
+          return {
+            id: element.id?.toString() || `hospital-${Math.random()}`,
+            name: element.tags?.name || 'Unnamed Hospital',
+            latitude: hospitalLat,
+            longitude: hospitalLon,
+            vicinity: element.tags?.['addr:street'] || '',
+            distance: getDistance(lat, lon, hospitalLat, hospitalLon),
+            type: 'hospital' as const,
+          };
+        })
+        .filter((h: any) => h !== null)
+        .sort((a: any, b: any) => a.distance - b.distance)
+        .slice(0, 5);
+
+      setHospitals(hospitalList);
+      setShowingHospitals(true);
+
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude: lat,
+          longitude: lon,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        }, 1000);
+      }
+      Alert.alert('Success', `Found ${hospitalList.length} nearest hospitals`);
+    } else {
+      Alert.alert('No Results', 'No hospitals found nearby');
+    }
+    setLoadingHospitals(false);
   };
 
   const toggleHospitals = async () => {
@@ -763,6 +785,16 @@ export default function Dashboard() {
                 }}
                 onDeviceDisconnected={() => {
                   console.log('Device disconnected');
+                }}
+                onTriggerRecorded={async () => {
+                  // Refresh triggers list and remaining doses after a physical trigger
+                  try {
+                    await loadTriggers();
+                  } catch {}
+                  try {
+                    const v = await getRemainingDoses();
+                    setRemainingDoses(v);
+                  } catch {}
                 }}
               />
             </View>

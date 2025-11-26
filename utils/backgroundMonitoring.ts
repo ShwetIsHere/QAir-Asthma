@@ -52,11 +52,9 @@ export async function startBackgroundRiskMonitoring() {
     if (!req.granted) return false;
   }
 
-  // Avoid duplicate registrations
-  const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_RISK_TASK).catch(() => false);
-  if (isRegistered) {
-    return true;
-  }
+  // Avoid duplicate location update streams for this task
+  const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_RISK_TASK).catch(() => false);
+  if (hasStarted) return true;
 
   // Start updates: ~1 minute, ~200 meters changes (adjust as needed)
   await Location.startLocationUpdatesAsync(BACKGROUND_RISK_TASK, {
@@ -75,9 +73,10 @@ export async function startBackgroundRiskMonitoring() {
 }
 
 export async function stopBackgroundRiskMonitoring() {
-  const tasks = await TaskManager.getTaskOptionsAsync(BACKGROUND_RISK_TASK).catch(() => null);
-  // Even if options not retrievable, call stop
   try {
-    await Location.stopLocationUpdatesAsync(BACKGROUND_RISK_TASK);
+    const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_RISK_TASK).catch(() => false);
+    if (hasStarted) {
+      await Location.stopLocationUpdatesAsync(BACKGROUND_RISK_TASK);
+    }
   } catch {}
 }

@@ -4,6 +4,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { RiskAssessment } from './riskAssessment';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -70,6 +71,21 @@ export const sendRiskAlert = async (
     if (!hasPermission) {
       console.log('Cannot send notification: permission denied');
       return;
+    }
+
+    // Global 1-minute cooldown to prevent spam
+    const COOLDOWN_MS = 60 * 1000;
+    try {
+      const lastTsStr = await AsyncStorage.getItem('riskNotifyLastTs');
+      const lastTs = lastTsStr ? Number(lastTsStr) : 0;
+      const now = Date.now();
+      if (now - lastTs < COOLDOWN_MS) {
+        console.log('Risk alert suppressed due to cooldown');
+        return;
+      }
+      await AsyncStorage.setItem('riskNotifyLastTs', String(now));
+    } catch (e) {
+      console.warn('Cooldown check failed, proceeding anyway', e);
     }
 
     // Determine notification content based on risk level

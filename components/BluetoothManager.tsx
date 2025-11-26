@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { supabase } from '@/utils/supabase';
 import { fetchAirQuality } from '@/utils/airQuality';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Lazy import BLE Manager to avoid initialization errors in Expo Go
 let BleManager: any = null;
@@ -87,6 +88,7 @@ export default function BluetoothManager({
   useEffect(() => {
     let subscription: any = null;
     let isMounted = true;
+    let disconnectListener: any = null;
 
     const setupBLE = async () => {
       if (!isMounted) return;
@@ -111,6 +113,30 @@ export default function BluetoothManager({
       if (isMounted) {
         checkBluetoothEnabled();
       }
+
+      // Rehydrate previously connected device state if still connected
+      try {
+        const saved = await AsyncStorage.getItem('bleConnectedDevice');
+        if (saved) {
+          const savedDevice: BluetoothDevice = JSON.parse(saved);
+          if (savedDevice?.id) {
+            const stillConnected = await manager.isDeviceConnected(savedDevice.id);
+            if (stillConnected) {
+              setConnectedDevice({ ...savedDevice, isConnected: true });
+              // Listen for disconnects to keep UI in sync
+              disconnectListener = manager.onDeviceDisconnected(savedDevice.id, () => {
+                setConnectedDevice(null);
+                AsyncStorage.removeItem('bleConnectedDevice').catch(() => {});
+                if (onDeviceDisconnected) onDeviceDisconnected();
+              });
+            } else {
+              await AsyncStorage.removeItem('bleConnectedDevice');
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to rehydrate BLE connection state:', e);
+      }
     };
 
     setupBLE();
@@ -119,6 +145,9 @@ export default function BluetoothManager({
       isMounted = false;
       if (subscription) {
         subscription.remove();
+      }
+      if (disconnectListener) {
+        disconnectListener.remove?.();
       }
       // Cleanup: Stop any ongoing scans and clear device list
       const cleanup = async () => {
@@ -428,6 +457,19 @@ export default function BluetoothManager({
       };
       
       setConnectedDevice(connectedDeviceData);
+      // Persist connection so other screens can reflect status
+      try {
+        await AsyncStorage.setItem('bleConnectedDevice', JSON.stringify({ id: connectedDeviceData.id, name: connectedDeviceData.name, rssi: connectedDeviceData.rssi, isConnected: true }));
+      } catch {}
+
+      // Subscribe for disconnect to keep state/storage in sync
+      try {
+        manager.onDeviceDisconnected(device.id, () => {
+          setConnectedDevice(null);
+          AsyncStorage.removeItem('bleConnectedDevice').catch(() => {});
+          if (onDeviceDisconnected) onDeviceDisconnected();
+        });
+      } catch {}
       setIsModalVisible(false);
       setIsScanning(false);
       
@@ -508,6 +550,12 @@ export default function BluetoothManager({
         'Inhaler Use Recorded',
         `Trigger #${triggerData.count} recorded at ${airQuality.category} air quality (AQI: ${airQuality.aqi})`
       );
+
+      // Decrement inhaler dose counter
+      try {
+        const { decrementDose } = await import('@/utils/inhalerCounter').then(m => m);
+        await decrementDose();
+      } catch {}
       
       // Notify parent component to refresh dashboard
       if (onTriggerRecorded) {
@@ -541,6 +589,7 @@ export default function BluetoothManager({
               }
               
               setConnectedDevice(null);
+              try { await AsyncStorage.removeItem('bleConnectedDevice'); } catch {}
               
               if (onDeviceDisconnected) {
                 onDeviceDisconnected();
