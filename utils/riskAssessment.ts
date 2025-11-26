@@ -224,18 +224,18 @@ export const checkTriggerSimilarity = async (
     
     console.log(`🏆 Best match: ${similarities[0]?.score || 0}% similarity`);
 
-    // Get top matches (score >= 50% similarity)
-    const significantMatches = similarities.filter((s) => s.score >= 50);
+    // Get top matches (score >= 25% similarity)
+    const significantMatches = similarities.filter((s) => s.score >= 25);
 
     // Determine risk level based on best match
     const highestScore = similarities[0]?.score || 0;
     let riskLevel: 'low' | 'medium' | 'high' = 'low';
     let isRisky = false;
 
-    if (highestScore >= 75) {
+    if (highestScore >= 50) {
       riskLevel = 'high';
       isRisky = true;
-    } else if (highestScore >= 50) {
+    } else if (highestScore >= 25) {
       riskLevel = 'medium';
       isRisky = true;
     }

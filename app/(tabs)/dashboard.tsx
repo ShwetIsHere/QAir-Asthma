@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Modal, Linking, Platform } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import MapView, { Marker, Circle, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,7 +14,9 @@ import BluetoothManager from '@/components/BluetoothManager';
 import SOSButton, { sendAutoEmergencySMS } from '@/components/SOSButton';
 import TestPredictiveRiskAPIs from '@/components/TestPredictiveRiskAPIs';
 import PredictiveRiskAlert from '@/components/PredictiveRiskAlert';
+import { getRemainingDoses } from '@/utils/inhalerCounter';
 import { sendRedZoneAlert } from '@/utils/notificationService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type InhalerTrigger = {
   id: string;
@@ -46,6 +48,7 @@ type Hospital = {
 };
 
 export default function Dashboard() {
+  const insets = useSafeAreaInsets();
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [triggers, setTriggers] = useState<InhalerTrigger[]>([]);
   const [redZones, setRedZones] = useState<RedZone[]>([]);
@@ -56,6 +59,7 @@ export default function Dashboard() {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [showingHospitals, setShowingHospitals] = useState(false);
   const [loadingHospitals, setLoadingHospitals] = useState(false);
+  const [remainingDoses, setRemainingDoses] = useState<number>(30);
   const [testApisModalVisible, setTestApisModalVisible] = useState(false);
   const [riskMonitorModalVisible, setRiskMonitorModalVisible] = useState(false);
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
@@ -65,6 +69,9 @@ export default function Dashboard() {
   const lastRedZoneAlertRef = useRef<{ zoneId: string; timestamp: number } | null>(null);
   const RED_ZONE_RADIUS_METERS = 500;
   const RED_ZONE_ALERT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+  const mapBottomPadding = 350 + insets.bottom;
+  const floatingButtonOffset = 64 + insets.bottom;
+  const triggerButtonOffset = 60 + insets.bottom;
 
   // Debug: Monitor hospitals state changes
   useEffect(() => {
@@ -136,6 +143,34 @@ export default function Dashboard() {
       // Cleanup red zones calculation
       setRedZones([]);
     };
+  }, [triggers]);
+
+  // Refresh remaining doses whenever the dashboard gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      getRemainingDoses()
+        .then((val) => {
+          if (active) setRemainingDoses(val);
+        })
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  // Ensure triggers refresh when returning to this tab (e.g., after deletion in Profile)
+  useFocusEffect(
+    React.useCallback(() => {
+      loadTriggers();
+      return () => {};
+    }, [])
+  );
+
+  // Load inhaler remaining doses on mount and when triggers list updates
+  useEffect(() => {
+    getRemainingDoses().then(setRemainingDoses).catch(() => {});
   }, [triggers]);
 
   useEffect(() => {
@@ -318,6 +353,9 @@ export default function Dashboard() {
       } else {
         Alert.alert('✅ Trigger Recorded', 'Inhaler use recorded. Sending emergency alert to contacts...');
         loadTriggers();
+        // Decrement inhaler dose counter
+        const { decrementDose } = await import('@/utils/inhalerCounter').then(m => m);
+        await decrementDose();
         
         // Automatically send SOS to emergency contacts
         await sendAutoEmergencySMS();
@@ -562,7 +600,7 @@ export default function Dashboard() {
             showsPointsOfInterest={true}
             showsBuildings={true}
             showsTraffic={false}
-            mapPadding={{ top: 0, right: 0, bottom: 350, left: 0 }}>
+            mapPadding={{ top: 0, right: 0, bottom: mapBottomPadding, left: 0 }}>
             {/* Inhaler Trigger Markers */}
             {triggers.map((trigger) => (
               <Marker
@@ -615,7 +653,7 @@ export default function Dashboard() {
         )}
 
         {/* Floating Action Buttons */}
-        <View className="absolute right-6 bottom-64 space-y-3">
+        <View className="absolute right-6 space-y-3" style={{ bottom: floatingButtonOffset }}>
           {/* SOS Button */}
           <SOSButton />
           
@@ -661,7 +699,7 @@ export default function Dashboard() {
         </View>
 
         {/* Add Trigger Button */}
-        <View className="absolute bottom-60 self-center">
+        <View className="absolute self-center" style={{ bottom: triggerButtonOffset }}>
           <TouchableOpacity
             onPress={handleAddTrigger}
             className="bg-red-500 px-10 py-5 rounded-full flex-row items-center shadow-2xl"
@@ -830,6 +868,14 @@ export default function Dashboard() {
             </View>
           </View>
         </Modal>
+
+        {/* Inhaler Counter Badge */}
+        <View style={{ position: 'absolute', top: insets.top + 12, right: 12 }}>
+          <View className="bg-white px-3 py-2 rounded-full shadow-md flex-row items-center" style={{ elevation: 4 }}>
+            <Ionicons name="medkit" size={16} color="#6366F1" />
+            <Text className="text-gray-900 font-bold ml-2">{remainingDoses}/30</Text>
+          </View>
+        </View>
       </View>
     </GestureHandlerRootView>
   );

@@ -170,6 +170,21 @@ export const sendRedZoneAlert = async (triggerCount: number): Promise<void> => {
   }
 };
 
+export async function sendLowInhalerAlert(remaining: number) {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Inhaler Low – Replace Soon',
+        body: `Only ${remaining} dose${remaining === 1 ? '' : 's'} left out of 30. Please prepare a replacement.`,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        sound: 'default',
+      },
+      trigger: null,
+    });
+  } catch (e) {
+    console.error('Failed to send low inhaler alert', e);
+  }
+}
 /**
  * Send a daily environmental report notification
  * @param aqi Current AQI

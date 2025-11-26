@@ -11,7 +11,7 @@
  * NO AI/ML MODELS USED - Pure rule-based logic
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -20,12 +20,16 @@ import {
   Switch,
   Alert,
   ScrollView,
+  AppState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/utils/supabase';
 import { getCurrentLocation, requestBackgroundLocationPermission, getLocationPermissionStatus } from '@/utils/geofencing';
 import { fetchEnvironmentalData, EnvironmentalData } from '@/utils/environmentalDataAPI';
 import { checkTriggerSimilarity, RiskAssessment } from '@/utils/riskAssessment';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { sendRiskAlert } from '@/utils/notificationService';
+import { startBackgroundRiskMonitoring, stopBackgroundRiskMonitoring } from '@/utils/backgroundMonitoring';
 
 export default function PredictiveRiskAlert() {
   const [loading, setLoading] = useState(false);
@@ -36,9 +40,47 @@ export default function PredictiveRiskAlert() {
   const [lastCheckTime, setLastCheckTime] = useState<Date | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [monitorTimer, setMonitorTimer] = useState<NodeJS.Timer | null>(null);
+  const [lastNotifyTs, setLastNotifyTs] = useState<number | null>(null);
+  const monitoringEnabledRef = useRef(false);
 
   useEffect(() => {
     checkPermissions();
+    // Restore monitoring toggle from storage
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem('riskMonitoringEnabled');
+        if (saved === 'true') {
+          // Attempt to enable silently (no alerts/spinners)
+          toggleMonitoring(true, { silent: true });
+        }
+      } catch {}
+    })();
+
+    // Restore last notification timestamp for cooldown
+    (async () => {
+      try {
+        const ts = await AsyncStorage.getItem('riskNotifyLastTs');
+        if (ts) setLastNotifyTs(Number(ts));
+      } catch {}
+    })();
+
+    // Keep monitoring active when returning to foreground
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        if (monitoringEnabledRef.current) {
+          checkCurrentRisk();
+        }
+      }
+    });
+
+    return () => {
+      sub.remove();
+      // Cleanup interval on unmount
+      if (monitorTimer) {
+        clearInterval(monitorTimer as unknown as number);
+      }
+    };
   }, []);
 
   /**
@@ -131,6 +173,21 @@ export default function PredictiveRiskAlert() {
    * Display appropriate alert based on risk level
    */
   const displayRiskAlert = (assessment: RiskAssessment, envData: EnvironmentalData) => {
+    // Also send a local notification when risk is medium/high, with 1-minute cooldown
+    if (assessment.isRisky) {
+      const now = Date.now();
+      const last = lastNotifyTs ?? 0;
+      if (now - last >= 60 * 1000) {
+        sendRiskAlert(assessment)
+          .then(async () => {
+            setLastNotifyTs(now);
+            await AsyncStorage.setItem('riskNotifyLastTs', String(now));
+          })
+          .catch((e) => console.error('Notification send error', e));
+      } else {
+        console.log('Risk notification suppressed (cooldown active)');
+      }
+    }
     if (assessment.riskLevel === 'high') {
       Alert.alert(
         '🚨 HIGH ASTHMA RISK ALERT',
@@ -177,11 +234,29 @@ export default function PredictiveRiskAlert() {
   /**
    * Toggle automatic monitoring
    */
-  const toggleMonitoring = async (enabled: boolean) => {
+  const startForegroundMonitoring = () => {
+    setMonitoringEnabled(true);
+    monitoringEnabledRef.current = true;
+    if (monitorTimer) {
+      clearInterval(monitorTimer as unknown as number);
+    }
+    const timer = setInterval(() => {
+      checkCurrentRisk();
+    }, 1 * 60 * 1000);
+    setMonitorTimer(timer);
+  };
+
+  const toggleMonitoring = async (enabled: boolean, options?: { silent?: boolean }) => {
     if (enabled) {
-      // Request background permissions for continuous monitoring
+      // Request background permissions for continuous monitoring (foreground-only fallback)
       const granted = await requestBackgroundLocationPermission();
       if (!granted) {
+        // In silent/rehydration mode, still enable foreground monitoring without background permission
+        if (options?.silent) {
+          startForegroundMonitoring();
+          await AsyncStorage.setItem('riskMonitoringEnabled', 'true');
+          return;
+        }
         Alert.alert(
           'Permission Required',
           'Background location permission is needed for automatic risk monitoring.\n\n⚠️ If you see an error, you need to rebuild the app:\n\n1. Run: npx expo prebuild --clean\n2. Run: npx expo run:android\n\nFor now, you can use "Check Risk Now" manually.',
@@ -190,17 +265,30 @@ export default function PredictiveRiskAlert() {
         return;
       }
       
-      // Perform first check
-      await checkCurrentRisk();
-      setMonitoringEnabled(true);
+      // Start periodic monitoring; optionally skip immediate check
+      if (!options?.silent) {
+        await checkCurrentRisk();
+      }
+      // Check every 5 minutes in foreground; for background use TaskManager
+      startForegroundMonitoring();
+
+      // Attempt to start background monitoring (dev/production build required)
+      await startBackgroundRiskMonitoring().catch(() => {});
       
-      Alert.alert(
-        'Monitoring Enabled',
-        'QAir will check your asthma risk automatically as you move around.',
-        [{ text: 'Great!' }]
-      );
+      await AsyncStorage.setItem('riskMonitoringEnabled', 'true');
+      if (!options?.silent) {
+        Alert.alert('Monitoring Enabled', 'QAir will check your asthma risk automatically as you move around.', [{ text: 'Great!' }]);
+      }
     } else {
       setMonitoringEnabled(false);
+      monitoringEnabledRef.current = false;
+      if (monitorTimer) {
+        clearInterval(monitorTimer as unknown as number);
+        setMonitorTimer(null);
+      }
+      // Stop background monitoring if running
+      await stopBackgroundRiskMonitoring().catch(() => {});
+      await AsyncStorage.setItem('riskMonitoringEnabled', 'false');
       Alert.alert(
         'Monitoring Disabled', 
         'Automatic risk checking has been turned off.',

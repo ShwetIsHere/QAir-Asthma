@@ -168,6 +168,12 @@ export function useESP32InhalerMonitor() {
         [{ text: 'OK' }]
       );
 
+      // Decrement inhaler dose counter
+      try {
+        const { decrementDose } = await import('@/utils/inhalerCounter').then(m => m);
+        await decrementDose();
+      } catch {}
+
       // You can emit an event here to refresh the map
       // EventEmitter.emit('triggerRecorded', data);
 

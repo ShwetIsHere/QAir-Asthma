@@ -13,6 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { BarChart } from 'react-native-chart-kit';
 import { Calendar } from 'react-native-calendars';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getRemainingDoses, resetDoses } from '@/utils/inhalerCounter';
+// duplicate import removed
 import { supabase } from '@/utils/supabase';
 import BluetoothManager from '@/components/BluetoothManager';
 import EmergencyContactsManager from '@/components/EmergencyContactsManager';
@@ -53,6 +56,7 @@ type WeekDay = {
 };
 
 export default function ProfilePage() {
+  const insets = useSafeAreaInsets();
   const [userName, setUserName] = useState('User');
   const [triggers, setTriggers] = useState<TriggerData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +69,7 @@ export default function ProfilePage() {
   const [avgAqi, setAvgAqi] = useState(0);
   const [showAllPlaces, setShowAllPlaces] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [remainingDoses, setRemainingDoses] = useState<number>(30);
 
   useEffect(() => {
     let isMounted = true;
@@ -73,6 +78,8 @@ export default function ProfilePage() {
       if (isMounted) {
         await loadUserData();
         await loadTriggers();
+        const remain = await getRemainingDoses();
+        setRemainingDoses(remain);
       }
     };
     
@@ -95,6 +102,7 @@ export default function ProfilePage() {
       
       if (isMounted) {
         loadTriggers();
+        getRemainingDoses().then(setRemainingDoses).catch(() => {});
       }
       
       return () => {
@@ -102,6 +110,55 @@ export default function ProfilePage() {
       };
     }, [])
   );
+
+  const handleResetInhaler = async () => {
+    const t = await resetDoses(30);
+    setRemainingDoses(t);
+    Alert.alert('Inhaler Reset', 'Counter reset to 30 doses.');
+  };
+
+  const handleResetTriggers = async () => {
+    Alert.alert(
+      'Reset Trigger History',
+      'This will delete all your recorded inhaler triggers. This action cannot be undone. Do you want to proceed?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (!user) {
+                Alert.alert('Login Required', 'Please log in again to reset triggers.');
+                return;
+              }
+              const { error } = await supabase
+                .from('inhaler_triggers')
+                .delete()
+                .eq('user_id', user.id);
+              if (error) {
+                console.error('Error deleting triggers:', error);
+                Alert.alert('Error', 'Failed to reset triggers.');
+                return;
+              }
+              // Clear local state
+              setTriggers([]);
+              setTotalTriggers(0);
+              setAvgAqi(0);
+              setVisitedPlaces([]);
+              setWeeklyData([0, 0, 0, 0, 0, 0, 0]);
+              setMarkedDates({});
+              Alert.alert('Triggers Reset', 'All recorded triggers have been deleted.');
+            } catch (e) {
+              console.error('Reset triggers exception:', e);
+              Alert.alert('Error', 'An error occurred while resetting triggers.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const loadUserData = async () => {
     try {
@@ -490,7 +547,7 @@ export default function ProfilePage() {
         }}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         {/* User Profile Header */}
         <LinearGradient
           colors={['#6366F1', '#8B5CF6']}
@@ -514,6 +571,15 @@ export default function ProfilePage() {
               <Ionicons name="speedometer" size={24} color="white" />
               <Text className="text-white text-2xl font-bold mt-2">{avgAqi}</Text>
               <Text className="text-white/80 text-xs">Average AQI</Text>
+            </View>
+          </View>
+
+          {/* Inhaler Remaining Doses */}
+          <View className="flex-row justify-between mt-4">
+            <View className="bg-white/20 rounded-2xl p-4 flex-1">
+              <Ionicons name="medkit" size={24} color="white" />
+              <Text className="text-white text-2xl font-bold mt-2">{remainingDoses}/30</Text>
+              <Text className="text-white/80 text-xs">Inhaler Doses Remaining</Text>
             </View>
           </View>
         </LinearGradient>
@@ -863,11 +929,25 @@ export default function ProfilePage() {
           </View>
         </TouchableOpacity>
 
+        {/* Reset Inhaler Counter */}
+        <View className="mx-5 mt-3">
+          <TouchableOpacity onPress={handleResetInhaler} className="bg-gray-100 rounded-2xl p-4 items-center" style={{ elevation: 2 }}>
+            <Text className="text-gray-700 font-semibold">Reset Inhaler Counter to 30</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Reset Trigger History */}
+        <View className="mx-5 mt-3 mb-4">
+          <TouchableOpacity onPress={handleResetTriggers} className="bg-red-100 rounded-2xl p-4 items-center" style={{ elevation: 2 }}>
+            <Text className="text-red-700 font-semibold">Delete All Recorded Triggers</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Logout Button */}
         <TouchableOpacity
           onPress={handleLogout}
-          className="bg-red-500 mx-5 mt-5 mb-32 rounded-2xl p-5 shadow-md"
-          style={{ elevation: 4 }}>
+          className="bg-red-500 mx-5 mt-5 rounded-2xl p-5 shadow-md"
+          style={{ elevation: 4, marginBottom: insets.bottom + 24 }}>
           <View className="flex-row items-center justify-center">
             <Ionicons name="log-out-outline" size={24} color="white" />
             <Text className="text-white font-bold text-lg ml-3">Logout</Text>
