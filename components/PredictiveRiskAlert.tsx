@@ -101,6 +101,10 @@ export default function PredictiveRiskAlert() {
    */
   const checkCurrentRisk = async () => {
     try {
+      // Prevent overlapping manual/background runs
+      if (checking) {
+        return;
+      }
       setChecking(true);
       console.log('=== Starting Risk Check ===');
 
@@ -240,13 +244,20 @@ export default function PredictiveRiskAlert() {
    * Toggle automatic monitoring
    */
   const startForegroundMonitoring = () => {
+    // Avoid duplicating intervals
+    if (monitoringEnabledRef.current) {
+      return;
+    }
     setMonitoringEnabled(true);
     monitoringEnabledRef.current = true;
     if (monitorTimer) {
       clearInterval(monitorTimer as unknown as number);
     }
     const timer = setInterval(() => {
-      checkCurrentRisk();
+      // Skip if a run is already in progress
+      if (!checking) {
+        checkCurrentRisk();
+      }
     }, 1 * 60 * 1000);
     setMonitorTimer(timer);
   };
@@ -365,21 +376,7 @@ export default function PredictiveRiskAlert() {
           </View>
         </View>
 
-        {/* Manual Check Button */}
-        <TouchableOpacity
-          onPress={checkCurrentRisk}
-          disabled={checking}
-          className="bg-indigo-600 mx-5 mt-5 rounded-2xl p-5 shadow-md flex-row items-center justify-center"
-          style={{ elevation: 4 }}>
-          {checking ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <>
-              <Ionicons name="search" size={24} color="white" />
-              <Text className="text-white font-bold text-lg ml-3">Check Risk Now</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {/* Manual Check Button removed as requested */}
 
         {/* Current Risk Status */}
         {riskAssessment && (

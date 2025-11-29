@@ -151,18 +151,7 @@ export const fetchPollenData = async (
 
     return null;
   } catch (error: any) {
-    // Handle common error codes gracefully without spamming logs
-    const status = error?.response?.status;
-    if (status === 401 || status === 403) {
-      console.warn('Pollen API unauthorized; using default values');
-    } else if (status === 422) {
-      console.warn('Pollen API returned 422 (invalid request/params); using default values');
-    } else if (status === 429) {
-      console.warn('Pollen API rate-limited; using default values');
-    } else {
-      console.warn('Pollen API error; using default values');
-    }
-    // Return default if Ambee API fails (it's a paid service)
+    // Quiet fallback: return defaults without warning spam
     return {
       pollenCount: 0,
       pollenLevel: 'low',
