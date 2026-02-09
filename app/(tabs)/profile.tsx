@@ -21,6 +21,7 @@ import BluetoothManager from '@/components/BluetoothManager';
 import EmergencyContactsManager from '@/components/EmergencyContactsManager';
 import AsthmaActionPlanManager from '@/components/AsthmaActionPlanManager';
 import { generateHealthReport } from '@/utils/pdfGenerator';
+import { colors, gradients } from '@/utils/theme';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -243,10 +244,10 @@ export default function ProfilePage() {
 
       // Mark date on calendar
       const aqiColor = trigger.aqi 
-        ? trigger.aqi <= 50 ? '#10B981' 
-          : trigger.aqi <= 100 ? '#F59E0B'
+        ? trigger.aqi <= 50 ? '#35C1A1' 
+          : trigger.aqi <= 100 ? '#60A5FA'
           : '#EF4444'
-        : '#6366F1';
+        : colors.accent2;
 
       dates[date] = {
         marked: true,
@@ -433,12 +434,12 @@ export default function ProfilePage() {
   };
 
   const getAQIColor = (aqi: number) => {
-    if (aqi <= 50) return '#10B981';
-    if (aqi <= 100) return '#F59E0B';
-    if (aqi <= 150) return '#F97316';
-    if (aqi <= 200) return '#EF4444';
-    if (aqi <= 300) return '#9333EA';
-    return '#7C2D12';
+    if (aqi <= 50) return '#35C1A1';
+    if (aqi <= 100) return '#60A5FA';
+    if (aqi <= 150) return '#FACC15';
+    if (aqi <= 200) return '#F87171';
+    if (aqi <= 300) return '#EF4444';
+    return '#991B1B';
   };
 
   const getAQICategory = (aqi: number) => {
@@ -489,23 +490,23 @@ export default function ProfilePage() {
   }, [weeklyData]);
 
   const chartConfig = useMemo(() => ({
-    backgroundColor: '#ffffff',
-    backgroundGradientFrom: '#ffffff',
-    backgroundGradientTo: '#ffffff',
+    backgroundColor: 'transparent',
+    backgroundGradientFrom: 'transparent',
+    backgroundGradientTo: 'transparent',
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+    color: (opacity = 1) => `rgba(77, 163, 255, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(169, 183, 204, ${opacity})`,
     style: { borderRadius: 16 },
     propsForBackgroundLines: {
       strokeDasharray: '',
-      stroke: '#F3F4F6',
+      stroke: 'rgba(255, 255, 255, 0.08)',
       strokeWidth: 1,
     },
     propsForLabels: {
       fontSize: 10,
     },
     barPercentage: 0.6,
-    fillShadowGradient: '#6366F1',
+    fillShadowGradient: colors.accent2,
     fillShadowGradientOpacity: 1,
   }), []);
 
@@ -521,27 +522,29 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-50 items-center justify-center">
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text className="text-gray-600 mt-4">Loading profile...</Text>
-      </View>
+      <LinearGradient colors={gradients.screen} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={colors.accent2} />
+        <Text style={{ color: colors.textMuted, marginTop: 16 }}>Loading profile...</Text>
+      </LinearGradient>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <LinearGradient colors={gradients.screen} style={{ flex: 1 }}>
+      <View className="flex-1">
       <Stack.Screen
         options={{
           title: 'Profile',
           headerShown: true,
-          headerStyle: { backgroundColor: '#6366F1' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
+          headerStyle: { backgroundColor: colors.bg },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontWeight: '700', color: colors.text },
           headerRight: () => (
             <TouchableOpacity
               onPress={handleSettings}
-              className="mr-4 bg-white/20 p-2 rounded-full">
-              <Ionicons name="settings-outline" size={24} color="white" />
+              className="mr-4 p-2 rounded-full"
+              style={{ backgroundColor: 'rgba(255, 255, 255, 0.12)', borderColor: colors.glassBorder, borderWidth: 1 }}>
+              <Ionicons name="settings-outline" size={24} color={colors.text} />
             </TouchableOpacity>
           ),
         }}
@@ -550,7 +553,7 @@ export default function ProfilePage() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         {/* User Profile Header */}
         <LinearGradient
-          colors={['#6366F1', '#8B5CF6']}
+          colors={gradients.header}
           className="px-6 py-8">
           <View className="items-center">
             <View className="bg-white/20 w-24 h-24 rounded-full items-center justify-center mb-4">
@@ -599,13 +602,13 @@ export default function ProfilePage() {
         </View>
 
         {/* Weekly Triggers Chart */}
-        <View className="bg-white mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
+        <View className="bg-white/10 mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
           <View className="flex-row items-center justify-between mb-4">
             <View>
-              <Text className="text-gray-900 text-xl font-bold">Weekly Activity</Text>
-              <Text className="text-gray-500 text-sm">Last 7 days</Text>
+              <Text className="text-slate-100 text-xl font-bold">Weekly Activity</Text>
+              <Text className="text-slate-300 text-sm">Last 7 days</Text>
             </View>
-            <Ionicons name="trending-up" size={24} color="#6366F1" />
+            <Ionicons name="trending-up" size={24} color={colors.accent2} />
           </View>
 
           {totalTriggers > 0 ? (
@@ -634,37 +637,37 @@ export default function ProfilePage() {
           ) : (
             <View className="py-8 items-center">
               <Ionicons name="bar-chart-outline" size={48} color="#D1D5DB" />
-              <Text className="text-gray-400 mt-2">No data yet</Text>
+              <Text className="text-slate-400 mt-2">No data yet</Text>
             </View>
           )}
         </View>
 
         {/* Calendar */}
-        <View className="bg-white mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
+        <View className="bg-white/10 mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
           <View className="flex-row items-center justify-between mb-4">
             <View>
-              <Text className="text-gray-900 text-xl font-bold">Trigger Calendar</Text>
-              <Text className="text-gray-500 text-sm">Tap a date to see details</Text>
+              <Text className="text-slate-100 text-xl font-bold">Trigger Calendar</Text>
+              <Text className="text-slate-300 text-sm">Tap a date to see details</Text>
             </View>
-            <Ionicons name="calendar" size={24} color="#6366F1" />
+            <Ionicons name="calendar" size={24} color={colors.accent2} />
           </View>
 
           <Calendar
             markedDates={markedDates}
             onDayPress={handleDateSelect}
             theme={{
-              backgroundColor: '#ffffff',
-              calendarBackground: '#ffffff',
-              textSectionTitleColor: '#6B7280',
-              selectedDayBackgroundColor: '#6366F1',
+              backgroundColor: 'transparent',
+              calendarBackground: 'transparent',
+              textSectionTitleColor: '#A9B7CC',
+              selectedDayBackgroundColor: colors.accent2,
               selectedDayTextColor: '#ffffff',
-              todayTextColor: '#6366F1',
-              dayTextColor: '#1F2937',
-              textDisabledColor: '#D1D5DB',
-              dotColor: '#6366F1',
+              todayTextColor: colors.accent,
+              dayTextColor: '#E7F1FF',
+              textDisabledColor: '#4B5563',
+              dotColor: colors.accent2,
               selectedDotColor: '#ffffff',
-              arrowColor: '#6366F1',
-              monthTextColor: '#1F2937',
+              arrowColor: colors.accent2,
+              monthTextColor: '#E7F1FF',
               textMonthFontWeight: 'bold',
             }}
           />
@@ -672,27 +675,27 @@ export default function ProfilePage() {
           <View className="flex-row items-center justify-center mt-4 space-x-4">
             <View className="flex-row items-center">
               <View className="w-3 h-3 rounded-full bg-green-500 mr-2" />
-              <Text className="text-gray-600 text-xs">Good</Text>
+              <Text className="text-slate-300 text-xs">Good</Text>
             </View>
             <View className="flex-row items-center">
               <View className="w-3 h-3 rounded-full bg-yellow-500 mr-2" />
-              <Text className="text-gray-600 text-xs">Moderate</Text>
+              <Text className="text-slate-300 text-xs">Moderate</Text>
             </View>
             <View className="flex-row items-center">
               <View className="w-3 h-3 rounded-full bg-red-500 mr-2" />
-              <Text className="text-gray-600 text-xs">Unhealthy</Text>
+              <Text className="text-slate-300 text-xs">Unhealthy</Text>
             </View>
           </View>
         </View>
 
         {/* Visited Places */}
-        <View className="bg-white mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
+        <View className="bg-white/10 mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
           <View className="flex-row items-center justify-between mb-4">
             <View>
-              <Text className="text-gray-900 text-xl font-bold">Top Visited Places</Text>
-              <Text className="text-gray-500 text-sm">Your frequent locations</Text>
+              <Text className="text-slate-100 text-xl font-bold">Top Visited Places</Text>
+              <Text className="text-slate-300 text-sm">Your frequent locations</Text>
             </View>
-            <Ionicons name="location-sharp" size={24} color="#6366F1" />
+            <Ionicons name="location-sharp" size={24} color={colors.accent2} />
           </View>
 
           {visitedPlaces.length > 0 ? (
@@ -702,14 +705,14 @@ export default function ProfilePage() {
                   key={`${place.location}-${index}`}
                   className="flex-row items-center justify-between py-4 border-b border-gray-100">
                   <View className="flex-row items-center flex-1">
-                    <View className="bg-indigo-50 w-12 h-12 rounded-xl items-center justify-center mr-3">
+                    <View className="bg-white/10 w-12 h-12 rounded-xl items-center justify-center mr-3">
                       <Text className="text-indigo-600 font-bold text-lg">{index + 1}</Text>
                     </View>
                     <View className="flex-1">
-                      <Text className="text-gray-900 font-semibold" numberOfLines={1}>
+                      <Text className="text-slate-100 font-semibold" numberOfLines={1}>
                         {place.location}
                       </Text>
-                      <Text className="text-gray-500 text-xs">
+                      <Text className="text-slate-300 text-xs">
                         {place.count} visit{place.count > 1 ? 's' : ''}
                       </Text>
                     </View>
@@ -729,14 +732,14 @@ export default function ProfilePage() {
               {visitedPlaces.length > 5 && (
                 <TouchableOpacity
                   onPress={() => setShowAllPlaces(!showAllPlaces)}
-                  className="bg-indigo-50 mt-4 py-3 rounded-xl flex-row items-center justify-center">
+                  className="bg-white/10 mt-4 py-3 rounded-xl flex-row items-center justify-center">
                   <Text className="text-indigo-600 font-semibold mr-2">
                     {showAllPlaces ? 'Show Less' : `Show All ${visitedPlaces.length} Places`}
                   </Text>
                   <Ionicons 
                     name={showAllPlaces ? "chevron-up" : "chevron-down"} 
                     size={20} 
-                    color="#6366F1" 
+                    color={colors.accent2} 
                   />
                 </TouchableOpacity>
               )}
@@ -744,19 +747,19 @@ export default function ProfilePage() {
           ) : (
             <View className="py-8 items-center">
               <Ionicons name="location-outline" size={48} color="#D1D5DB" />
-              <Text className="text-gray-400 mt-2">No places visited yet</Text>
+              <Text className="text-slate-400 mt-2">No places visited yet</Text>
             </View>
           )}
         </View>
 
         {/* All Marked Places */}
-        <View className="bg-white mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
+        <View className="bg-white/10 mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
           <View className="flex-row items-center justify-between mb-4">
             <View>
-              <Text className="text-gray-900 text-xl font-bold">All Marked Places</Text>
-              <Text className="text-gray-500 text-sm">Complete trigger history</Text>
+              <Text className="text-slate-100 text-xl font-bold">All Marked Places</Text>
+              <Text className="text-slate-300 text-sm">Complete trigger history</Text>
             </View>
-            <View className="bg-indigo-50 px-3 py-1 rounded-full">
+            <View className="bg-white/10 px-3 py-1 rounded-full">
               <Text className="text-indigo-600 font-bold">{totalTriggers}</Text>
             </View>
           </View>
@@ -784,18 +787,18 @@ export default function ProfilePage() {
                       key={trigger.id}
                       className="flex-row items-center justify-between py-4 border-b border-gray-100">
                       <View className="flex-row items-center flex-1">
-                        <View className="bg-indigo-50 w-10 h-10 rounded-xl items-center justify-center mr-3">
-                          <Ionicons name="location" size={20} color="#6366F1" />
+                        <View className="bg-white/10 w-10 h-10 rounded-xl items-center justify-center mr-3">
+                          <Ionicons name="location" size={20} color={colors.accent2} />
                         </View>
                         <View className="flex-1">
-                          <Text className="text-gray-900 font-semibold" numberOfLines={1}>
+                          <Text className="text-slate-100 font-semibold" numberOfLines={1}>
                             {trigger.latitude.toFixed(4)}, {trigger.longitude.toFixed(4)}
                           </Text>
-                          <Text className="text-gray-500 text-xs mt-1">
+                          <Text className="text-slate-300 text-xs mt-1">
                             {dateStr} • {timeStr}
                           </Text>
                           {trigger.temperature && (
-                            <Text className="text-gray-400 text-xs mt-1">
+                            <Text className="text-slate-400 text-xs mt-1">
                               {trigger.temperature}°C • Humidity: {trigger.humidity}%
                             </Text>
                           )}
@@ -818,14 +821,14 @@ export default function ProfilePage() {
               {triggers.length > 10 && (
                 <TouchableOpacity
                   onPress={() => setShowAllPlaces(!showAllPlaces)}
-                  className="bg-indigo-50 mt-4 py-3 rounded-xl flex-row items-center justify-center">
+                  className="bg-white/10 mt-4 py-3 rounded-xl flex-row items-center justify-center">
                   <Text className="text-indigo-600 font-semibold mr-2">
                     {showAllPlaces ? 'Show Less' : `Show All ${triggers.length} Places`}
                   </Text>
                   <Ionicons 
                     name={showAllPlaces ? "chevron-up" : "chevron-down"} 
                     size={20} 
-                    color="#6366F1" 
+                    color={colors.accent2} 
                   />
                 </TouchableOpacity>
               )}
@@ -833,25 +836,25 @@ export default function ProfilePage() {
           ) : (
             <View className="py-8 items-center">
               <Ionicons name="map-outline" size={48} color="#D1D5DB" />
-              <Text className="text-gray-400 mt-2">No places marked yet</Text>
-              <Text className="text-gray-400 text-xs mt-1">Start recording triggers on the map</Text>
+              <Text className="text-slate-400 mt-2">No places marked yet</Text>
+              <Text className="text-slate-400 text-xs mt-1">Start recording triggers on the map</Text>
             </View>
           )}
         </View>
 
         {/* Weather Quality Summary */}
-        <View className="bg-white mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
+        <View className="bg-white/10 mx-5 mt-5 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
           <View className="flex-row items-center justify-between mb-4">
             <View>
-              <Text className="text-gray-900 text-xl font-bold">Air Quality Summary</Text>
-              <Text className="text-gray-500 text-sm">Overall exposure</Text>
+              <Text className="text-slate-100 text-xl font-bold">Air Quality Summary</Text>
+              <Text className="text-slate-300 text-sm">Overall exposure</Text>
             </View>
-            <Ionicons name="cloud" size={24} color="#6366F1" />
+            <Ionicons name="cloud" size={24} color={colors.accent2} />
           </View>
 
-          <View className="bg-gray-50 rounded-2xl p-4">
+          <View className="bg-white/5 rounded-2xl p-4">
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-gray-600">Average AQI</Text>
+              <Text className="text-slate-300">Average AQI</Text>
               <View
                 className="px-4 py-2 rounded-xl"
                 style={{ backgroundColor: getAQIColor(avgAqi) }}>
@@ -860,7 +863,7 @@ export default function ProfilePage() {
             </View>
 
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-gray-600">Category</Text>
+              <Text className="text-slate-300">Category</Text>
               <Text
                 className="font-semibold"
                 style={{ color: getAQIColor(avgAqi) }}>
@@ -869,8 +872,8 @@ export default function ProfilePage() {
             </View>
 
             <View className="flex-row items-center justify-between">
-              <Text className="text-gray-600">Total Recordings</Text>
-              <Text className="text-gray-900 font-bold">{totalTriggers}</Text>
+              <Text className="text-slate-300">Total Recordings</Text>
+              <Text className="text-slate-100 font-bold">{totalTriggers}</Text>
             </View>
           </View>
 
@@ -931,8 +934,8 @@ export default function ProfilePage() {
 
         {/* Reset Inhaler Counter */}
         <View className="mx-5 mt-3">
-          <TouchableOpacity onPress={handleResetInhaler} className="bg-gray-100 rounded-2xl p-4 items-center" style={{ elevation: 2 }}>
-            <Text className="text-gray-700 font-semibold">Reset Inhaler Counter to 30</Text>
+          <TouchableOpacity onPress={handleResetInhaler} className="bg-white/5 rounded-2xl p-4 items-center" style={{ elevation: 2 }}>
+            <Text className="text-slate-200 font-semibold">Reset Inhaler Counter to 30</Text>
           </TouchableOpacity>
         </View>
 
@@ -954,6 +957,7 @@ export default function ProfilePage() {
           </View>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+      </View>
+    </LinearGradient>
   );
 }

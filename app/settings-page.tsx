@@ -12,6 +12,7 @@ import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors, gradients } from '@/utils/theme';
 
 const APP_VERSION = '1.0.0';
 
@@ -181,29 +182,29 @@ export default function SettingsPage() {
   }) => (
     <TouchableOpacity
       onPress={onPress}
-      className="flex-row items-center justify-between py-4 px-4 bg-white rounded-2xl mb-3"
-      style={{ elevation: 2 }}
+      className="flex-row items-center justify-between py-4 px-4 bg-white/10 rounded-2xl mb-3"
+      style={{ elevation: 2, borderColor: colors.glassBorder, borderWidth: 1 }}
       disabled={!onPress && !rightComponent}>
       <View className="flex-row items-center flex-1">
-        <View className="bg-indigo-50 w-10 h-10 rounded-xl items-center justify-center mr-4">
-          <Ionicons name={icon} size={22} color="#6366F1" />
+        <View className="w-10 h-10 rounded-xl items-center justify-center mr-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.12)' }}>
+          <Ionicons name={icon} size={22} color={colors.accent2} />
         </View>
         <View className="flex-1">
-          <Text className="text-gray-900 font-semibold text-base">{title}</Text>
+          <Text className="text-slate-100 font-semibold text-base">{title}</Text>
           {subtitle && (
-            <Text className="text-gray-500 text-xs mt-1">{subtitle}</Text>
+            <Text className="text-slate-300 text-xs mt-1">{subtitle}</Text>
           )}
         </View>
       </View>
       {rightComponent ? rightComponent : showArrow && (
-        <Ionicons name="chevron-forward" size={22} color="#9CA3AF" />
+        <Ionicons name="chevron-forward" size={22} color={colors.textSubtle} />
       )}
     </TouchableOpacity>
   );
 
   const SettingSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <View className="mb-6">
-      <Text className="text-gray-600 font-bold text-sm mb-3 px-2 uppercase tracking-wide">
+      <Text className="text-slate-300 font-bold text-sm mb-3 px-2 uppercase tracking-wide">
         {title}
       </Text>
       {children}
@@ -211,19 +212,17 @@ export default function SettingsPage() {
   );
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <LinearGradient colors={gradients.screen} style={{ flex: 1 }}>
       <Stack.Screen
         options={{
           title: 'Settings',
           headerShown: true,
-          headerStyle: { backgroundColor: '#6366F1' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
+          headerStyle: { backgroundColor: colors.bg },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontWeight: '700', color: colors.text },
           headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="ml-4">
-              <Ionicons name="arrow-back" size={24} color="white" />
+            <TouchableOpacity onPress={() => router.back()} className="ml-4">
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
           ),
         }}
@@ -231,16 +230,16 @@ export default function SettingsPage() {
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <LinearGradient
-          colors={['#6366F1', '#8B5CF6']}
-          className="px-6 py-6 mb-5">
+        <LinearGradient colors={gradients.header} className="px-6 py-6 mb-5">
           <View className="flex-row items-center">
-            <View className="bg-white/20 w-16 h-16 rounded-full items-center justify-center mr-4">
+            <View
+              className="w-16 h-16 rounded-full items-center justify-center mr-4"
+              style={{ backgroundColor: 'rgba(255, 255, 255, 0.12)', borderColor: colors.glassBorder, borderWidth: 1 }}>
               <Ionicons name="settings" size={32} color="white" />
             </View>
             <View>
-              <Text className="text-white text-2xl font-bold">Settings</Text>
-              <Text className="text-white/80 text-sm">Customize your experience</Text>
+              <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700' }}>Settings</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12 }}>Customize your experience</Text>
             </View>
           </View>
         </LinearGradient>
@@ -267,8 +266,8 @@ export default function SettingsPage() {
                 <Switch
                   value={pushNotifications}
                   onValueChange={handlePushNotificationToggle}
-                  trackColor={{ false: '#D1D5DB', true: '#A5B4FC' }}
-                  thumbColor={pushNotifications ? '#6366F1' : '#F3F4F6'}
+                  trackColor={{ false: 'rgba(255, 255, 255, 0.18)', true: colors.accent }}
+                  thumbColor={pushNotifications ? colors.accent2 : '#E5E7EB'}
                 />
               }
             />
@@ -281,8 +280,8 @@ export default function SettingsPage() {
                 <Switch
                   value={locationTracking}
                   onValueChange={handleLocationTrackingToggle}
-                  trackColor={{ false: '#D1D5DB', true: '#A5B4FC' }}
-                  thumbColor={locationTracking ? '#6366F1' : '#F3F4F6'}
+                  trackColor={{ false: 'rgba(255, 255, 255, 0.18)', true: colors.accent }}
+                  thumbColor={locationTracking ? colors.accent2 : '#E5E7EB'}
                 />
               }
             />
@@ -295,8 +294,8 @@ export default function SettingsPage() {
                 <Switch
                   value={darkMode}
                   onValueChange={handleDarkModeToggle}
-                  trackColor={{ false: '#D1D5DB', true: '#A5B4FC' }}
-                  thumbColor={darkMode ? '#6366F1' : '#F3F4F6'}
+                  trackColor={{ false: 'rgba(255, 255, 255, 0.18)', true: colors.accent }}
+                  thumbColor={darkMode ? colors.accent2 : '#E5E7EB'}
                 />
               }
             />
@@ -341,10 +340,10 @@ export default function SettingsPage() {
 
         {/* Footer */}
         <View className="items-center py-8">
-          <Text className="text-gray-400 text-xs">Made with ❤️ for asthma patients</Text>
-          <Text className="text-gray-400 text-xs mt-1">© 2025 QAir App</Text>
+          <Text style={{ color: colors.textSubtle, fontSize: 12 }}>Made with care for asthma patients</Text>
+          <Text style={{ color: colors.textSubtle, fontSize: 12, marginTop: 4 }}>© 2025 QAir App</Text>
         </View>
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }

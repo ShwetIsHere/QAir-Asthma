@@ -10,7 +10,8 @@ import {
 import { Stack, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/utils/supabase';
-import { Card } from '@/components/Card';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, gradients } from '@/utils/theme';
 
 export default function Settings() {
   const [user, setUser] = useState<any>(null);
@@ -77,69 +78,69 @@ export default function Settings() {
     <TouchableOpacity
       onPress={onPress}
       disabled={!onPress}
-      className="flex-row items-center py-4 px-5 bg-white mb-3"
-      style={{ borderRadius: 16 }}>
+      className="flex-row items-center py-4 px-5 bg-white/10 mb-3"
+      style={{ borderRadius: 16, borderColor: colors.glassBorder, borderWidth: 1 }}>
       <View 
         className="w-12 h-12 rounded-full items-center justify-center"
-        style={{ backgroundColor: iconBg || '#EEF2FF' }}>
-        <Ionicons name={icon} size={24} color={iconColor || '#6366F1'} />
+        style={{ backgroundColor: iconBg || 'rgba(255, 255, 255, 0.12)' }}>
+        <Ionicons name={icon} size={24} color={iconColor || colors.accent2} />
       </View>
       <View className="flex-1 ml-4">
-        <Text className="text-gray-900 font-semibold text-base">{title}</Text>
-        {subtitle && <Text className="text-gray-400 text-sm mt-1">{subtitle}</Text>}
+        <Text className="text-slate-100 font-semibold text-base">{title}</Text>
+        {subtitle && <Text className="text-slate-400 text-sm mt-1">{subtitle}</Text>}
       </View>
-      {rightElement || <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />}
+      {rightElement || <Ionicons name="chevron-forward" size={20} color={colors.textSubtle} />}
     </TouchableOpacity>
   );
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <LinearGradient colors={gradients.screen} style={{ flex: 1 }}>
       <Stack.Screen
         options={{
           title: 'Settings',
-          headerStyle: { backgroundColor: '#6366F1' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
+          headerStyle: { backgroundColor: colors.bg },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontWeight: '700', color: colors.text },
         }}
       />
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         {/* Profile Section */}
-        <View className="bg-white px-6 pt-8 pb-6 items-center">
+        <View className="px-6 pt-8 pb-6 items-center">
           <View 
-            className="w-24 h-24 rounded-full items-center justify-center mb-4 border-4 border-indigo-100"
-            style={{ backgroundColor: '#6366F1' }}>
+            className="w-24 h-24 rounded-full items-center justify-center mb-4"
+            style={{ backgroundColor: colors.accent2, borderColor: colors.glassBorder, borderWidth: 1 }}>
             <Text className="text-white text-4xl font-bold">
               {user?.user_metadata?.full_name?.charAt(0)?.toUpperCase() || 'S'}
             </Text>
           </View>
-          <Text className="text-gray-400 text-sm mb-6">{user?.email || ''}</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 12 }}>{user?.email || ''}</Text>
         </View>
 
         <View className="px-6 mt-6">
           {/* Account Settings */}
-          <Text className="text-gray-900 font-bold text-xl mb-4">Account Settings</Text>
+          <Text className="text-slate-100 font-bold text-xl mb-4">Account Settings</Text>
           <View className="mb-6">
             <SettingItem
               icon="person-outline"
-              iconColor="#6366F1"
-              iconBg="#EEF2FF"
+              iconColor={colors.accent2}
+              iconBg={'rgba(255, 255, 255, 0.12)'}
               title="Edit Profile"
               subtitle="Update your personal information"
               onPress={() => Alert.alert('Coming Soon', 'Profile editing feature coming soon')}
             />
             <SettingItem
               icon="key-outline"
-              iconColor="#6366F1"
-              iconBg="#EEF2FF"
+              iconColor={colors.accent2}
+              iconBg={'rgba(255, 255, 255, 0.12)'}
               title="Change Password"
               subtitle="Update your password"
               onPress={() => Alert.alert('Coming Soon', 'Password change feature coming soon')}
             />
             <SettingItem
               icon="shield-checkmark-outline"
-              iconColor="#6366F1"
-              iconBg="#EEF2FF"
+              iconColor={colors.accent2}
+              iconBg={'rgba(255, 255, 255, 0.12)'}
               title="Privacy & Security"
               subtitle="Manage your privacy settings"
               onPress={() => Alert.alert('Coming Soon', 'Privacy settings coming soon')}
@@ -147,73 +148,73 @@ export default function Settings() {
           </View>
 
           {/* App Preferences */}
-          <Text className="text-gray-900 font-bold text-xl mb-4">App Preferences</Text>
+          <Text className="text-slate-100 font-bold text-xl mb-4">App Preferences</Text>
           <View className="mb-6">
             <SettingItem
               icon="notifications-outline"
-              iconColor="#6366F1"
-              iconBg="#EEF2FF"
+              iconColor={colors.accent2}
+              iconBg={'rgba(255, 255, 255, 0.12)'}
               title="Push Notifications"
               subtitle="Receive alerts about air quality"
               rightElement={
                 <Switch
                   value={notifications}
                   onValueChange={setNotifications}
-                  trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                  thumbColor={notifications ? '#6366F1' : '#F3F4F6'}
-                  ios_backgroundColor="#E5E7EB"
+                  trackColor={{ false: 'rgba(255, 255, 255, 0.18)', true: colors.accent }}
+                  thumbColor={notifications ? colors.accent2 : '#E5E7EB'}
+                  ios_backgroundColor="rgba(255, 255, 255, 0.18)"
                 />
               }
             />
             <SettingItem
               icon="location-outline"
-              iconColor="#6366F1"
-              iconBg="#EEF2FF"
+              iconColor={colors.accent2}
+              iconBg={'rgba(255, 255, 255, 0.12)'}
               title="Location Tracking"
               subtitle="Enable automatic location tracking"
               rightElement={
                 <Switch
                   value={locationTracking}
                   onValueChange={setLocationTracking}
-                  trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                  thumbColor={locationTracking ? '#6366F1' : '#F3F4F6'}
-                  ios_backgroundColor="#E5E7EB"
+                  trackColor={{ false: 'rgba(255, 255, 255, 0.18)', true: colors.accent }}
+                  thumbColor={locationTracking ? colors.accent2 : '#E5E7EB'}
+                  ios_backgroundColor="rgba(255, 255, 255, 0.18)"
                 />
               }
             />
             <SettingItem
               icon="moon-outline"
-              iconColor="#6366F1"
-              iconBg="#EEF2FF"
+              iconColor={colors.accent2}
+              iconBg={'rgba(255, 255, 255, 0.12)'}
               title="Dark Mode"
               subtitle="Change app appearance"
               rightElement={
                 <Switch
                   value={darkMode}
                   onValueChange={setDarkMode}
-                  trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                  thumbColor={darkMode ? '#6366F1' : '#F3F4F6'}
-                  ios_backgroundColor="#E5E7EB"
+                  trackColor={{ false: 'rgba(255, 255, 255, 0.18)', true: colors.accent }}
+                  thumbColor={darkMode ? colors.accent2 : '#E5E7EB'}
+                  ios_backgroundColor="rgba(255, 255, 255, 0.18)"
                 />
               }
             />
           </View>
 
           {/* Data & Storage */}
-          <Text className="text-gray-900 font-bold text-xl mb-4">Data & Storage</Text>
+          <Text className="text-slate-100 font-bold text-xl mb-4">Data & Storage</Text>
           <View className="mb-6">
             <SettingItem
               icon="download-outline"
-              iconColor="#10B981"
-              iconBg="#D1FAE5"
+              iconColor={colors.accent}
+              iconBg={'rgba(53, 193, 161, 0.18)'}
               title="Export Data"
               subtitle="Download your trigger history"
               onPress={() => Alert.alert('Coming Soon', 'Data export feature coming soon')}
             />
             <SettingItem
               icon="trash-outline"
-              iconColor="#F59E0B"
-              iconBg="#FEF3C7"
+              iconColor={colors.warning}
+              iconBg={'rgba(250, 204, 21, 0.2)'}
               title="Clear Cache"
               subtitle="Clear all cached data and restart fresh"
               onPress={() => Alert.alert(
@@ -249,20 +250,20 @@ export default function Settings() {
           </View>
 
           {/* Support */}
-          <Text className="text-gray-900 font-bold text-xl mb-4">Support</Text>
+          <Text className="text-slate-100 font-bold text-xl mb-4">Support</Text>
           <View className="mb-6">
             <SettingItem
               icon="help-circle-outline"
-              iconColor="#8B5CF6"
-              iconBg="#EDE9FE"
+              iconColor={colors.accent2}
+              iconBg={'rgba(77, 163, 255, 0.15)'}
               title="Help Center"
               subtitle="Get help and support"
               onPress={() => Alert.alert('Coming Soon', 'Help center coming soon')}
             />
             <SettingItem
               icon="mail-outline"
-              iconColor="#8B5CF6"
-              iconBg="#EDE9FE"
+              iconColor={colors.accent2}
+              iconBg={'rgba(77, 163, 255, 0.15)'}
               title="Contact Us"
               subtitle="Send us your feedback"
               onPress={() => Alert.alert(
@@ -296,8 +297,8 @@ export default function Settings() {
             />
             <SettingItem
               icon="information-circle-outline"
-              iconColor="#8B5CF6"
-              iconBg="#EDE9FE"
+              iconColor={colors.accent2}
+              iconBg={'rgba(77, 163, 255, 0.15)'}
               title="About"
               subtitle="Version 1.0.0"
               onPress={() => Alert.alert(
@@ -320,6 +321,6 @@ export default function Settings() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }

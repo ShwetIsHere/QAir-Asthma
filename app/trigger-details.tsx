@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { fetchAirQuality, getPlaceName } from '@/utils/airQuality';
 import { analyzeLocationSuitability } from '@/utils/openrouter';
+import { colors, gradients } from '@/utils/theme';
 
 type WeatherData = {
   aqi: number;
@@ -175,31 +176,31 @@ export default function TriggerDetails() {
   };
 
   const getAQIColor = (aqi: number) => {
-    if (aqi <= 50) return { bg: '#10B981', text: 'Good' };
-    if (aqi <= 100) return { bg: '#F59E0B', text: 'Moderate' };
-    if (aqi <= 150) return { bg: '#F97316', text: 'Unhealthy for Sensitive' };
-    if (aqi <= 200) return { bg: '#EF4444', text: 'Unhealthy' };
-    if (aqi <= 300) return { bg: '#9333EA', text: 'Very Unhealthy' };
-    return { bg: '#7C2D12', text: 'Hazardous' };
+    if (aqi <= 50) return { bg: '#35C1A1', text: 'Good' };
+    if (aqi <= 100) return { bg: '#60A5FA', text: 'Moderate' };
+    if (aqi <= 150) return { bg: '#FACC15', text: 'Unhealthy for Sensitive' };
+    if (aqi <= 200) return { bg: '#F87171', text: 'Unhealthy' };
+    if (aqi <= 300) return { bg: '#EF4444', text: 'Very Unhealthy' };
+    return { bg: '#991B1B', text: 'Hazardous' };
   };
 
   if (loading) {
     return (
-      <View className="flex-1 bg-white items-center justify-center">
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text className="text-gray-600 mt-4">Loading weather data...</Text>
-      </View>
+      <LinearGradient colors={gradients.screen} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={colors.accent2} />
+        <Text style={{ color: colors.textMuted, marginTop: 16 }}>Loading weather data...</Text>
+      </LinearGradient>
     );
   }
 
   if (error || !weatherData) {
     return (
-      <View className="flex-1 bg-white items-center justify-center px-6">
+      <LinearGradient colors={gradients.screen} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
         <Ionicons name="cloud-offline" size={64} color="#EF4444" />
-        <Text className="text-gray-900 text-xl font-bold mt-4 text-center">
+        <Text className="text-slate-100 text-xl font-bold mt-4 text-center">
           Unable to Load Weather Data
         </Text>
-        <Text className="text-gray-600 text-base mt-2 text-center">
+        <Text className="text-slate-300 text-base mt-2 text-center">
           {error || 'Failed to fetch weather information. Please check your internet connection and try again.'}
         </Text>
         <TouchableOpacity
@@ -207,32 +208,33 @@ export default function TriggerDetails() {
             setLoading(true);
             loadWeatherData();
           }}
-          className="bg-indigo-500 px-8 py-4 rounded-2xl mt-6">
+          className="px-8 py-4 rounded-2xl mt-6"
+          style={{ backgroundColor: colors.accent2 }}>
           <Text className="text-white font-bold text-base">Retry</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => router.back()}
           className="mt-4">
-          <Text className="text-indigo-500 font-semibold">Go Back</Text>
+          <Text style={{ color: colors.accent, fontWeight: '600' }}>Go Back</Text>
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
     );
   }
 
   const aqiInfo = weatherData ? getAQIColor(weatherData.aqi) : { bg: '#6B7280', text: 'Unknown' };
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <LinearGradient colors={gradients.screen} style={{ flex: 1 }}>
       <Stack.Screen
         options={{
           title: 'Location Weather',
           headerShown: true,
-          headerStyle: { backgroundColor: '#6366F1' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
+          headerStyle: { backgroundColor: colors.bg },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontWeight: '700', color: colors.text },
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()} className="mr-4">
-              <Ionicons name="arrow-back" size={24} color="white" />
+              <Ionicons name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
           ),
         }}
@@ -240,7 +242,7 @@ export default function TriggerDetails() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Location Info Banner */}
-        <View className="bg-blue-500 px-5 py-4">
+        <View className="px-5 py-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)', borderBottomColor: colors.glassBorder, borderBottomWidth: 1 }}>
           <Text className="text-white/80 text-sm">
             {new Date(timestamp).toLocaleDateString('en-US', {
               month: 'short',
@@ -330,47 +332,47 @@ export default function TriggerDetails() {
         </LinearGradient>
 
         {/* Air Quality Details */}
-        <View className="mx-5 mt-5 bg-white rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
-          <Text className="text-gray-900 text-xl font-bold mb-4">Air Quality Details</Text>
+        <View className="mx-5 mt-5 bg-white/10 rounded-3xl p-6 shadow-md" style={{ elevation: 4, borderColor: colors.glassBorder, borderWidth: 1 }}>
+          <Text className="text-slate-100 text-xl font-bold mb-4">Air Quality Details</Text>
           
-          <View className="flex-row justify-between items-center mb-4 bg-gray-50 rounded-2xl p-4">
+          <View className="flex-row justify-between items-center mb-4 bg-white/5 rounded-2xl p-4">
             <View>
-              <Text className="text-gray-500 text-sm">PM 2.5</Text>
-              <Text className="text-gray-900 text-2xl font-bold">{weatherData?.pm25}</Text>
-              <Text className="text-gray-400 text-xs">μg/m³</Text>
+              <Text className="text-slate-300 text-sm">PM 2.5</Text>
+              <Text className="text-slate-100 text-2xl font-bold">{weatherData?.pm25}</Text>
+              <Text className="text-slate-400 text-xs">μg/m³</Text>
             </View>
-            <View className="h-12 w-px bg-gray-200" />
+            <View className="h-12 w-px bg-white/10" />
             <View>
-              <Text className="text-gray-500 text-sm">PM 10</Text>
-              <Text className="text-gray-900 text-2xl font-bold">{weatherData?.pm10}</Text>
-              <Text className="text-gray-400 text-xs">μg/m³</Text>
+              <Text className="text-slate-300 text-sm">PM 10</Text>
+              <Text className="text-slate-100 text-2xl font-bold">{weatherData?.pm10}</Text>
+              <Text className="text-slate-400 text-xs">μg/m³</Text>
             </View>
-            <View className="h-12 w-px bg-gray-200" />
+            <View className="h-12 w-px bg-white/10" />
             <View>
-              <Text className="text-gray-500 text-sm">AQI</Text>
-              <Text className="text-gray-900 text-2xl font-bold">{weatherData?.aqi}</Text>
-              <Text className="text-gray-400 text-xs">{aqiInfo.text}</Text>
+              <Text className="text-slate-300 text-sm">AQI</Text>
+              <Text className="text-slate-100 text-2xl font-bold">{weatherData?.aqi}</Text>
+              <Text className="text-slate-400 text-xs">{aqiInfo.text}</Text>
             </View>
           </View>
 
           {/* AI-Powered Location Analysis - ONLY REAL AI, NO PRELOADED TEXT */}
           {analysisLoading ? (
-            <View className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 border border-purple-200">
+            <View className="rounded-2xl p-4 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderColor: colors.glassBorder }}>
               <View className="flex-row items-center mb-2">
-                <ActivityIndicator size="small" color="#8B5CF6" />
-                <Text className="text-purple-900 font-semibold ml-2 text-sm">Analyzing with AI...</Text>
+                <ActivityIndicator size="small" color={colors.accent2} />
+                <Text className="text-slate-100 font-semibold ml-2 text-sm">Analyzing with AI...</Text>
               </View>
-              <Text className="text-purple-800 text-xs">
+              <Text className="text-slate-300 text-xs">
                 Fetching real-time health assessment from OpenRouter AI based on current weather data...
               </Text>
             </View>
           ) : aiAnalysis ? (
-            <View className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 border border-purple-200">
+            <View className="rounded-2xl p-4 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderColor: colors.glassBorder }}>
               <View className="flex-row items-center mb-2">
-                <Ionicons name="sparkles" size={18} color="#8B5CF6" />
-                <Text className="text-purple-900 font-semibold ml-2 text-sm">AI Health Assessment</Text>
+                <Ionicons name="sparkles" size={18} color={colors.accent2} />
+                <Text className="text-slate-100 font-semibold ml-2 text-sm">AI Health Assessment</Text>
               </View>
-              <Text className="text-purple-900 text-sm leading-5">
+              <Text className="text-slate-100 text-sm leading-5">
                 {aiAnalysis}
               </Text>
             </View>
@@ -378,48 +380,48 @@ export default function TriggerDetails() {
         </View>
 
         {/* Additional Weather Info */}
-        <View className="mx-5 mt-5 bg-white rounded-3xl p-6 shadow-md mb-6" style={{ elevation: 4 }}>
-          <Text className="text-gray-900 text-xl font-bold mb-4">Additional Information</Text>
+        <View className="mx-5 mt-5 bg-white/10 rounded-3xl p-6 shadow-md mb-6" style={{ elevation: 4, borderColor: colors.glassBorder, borderWidth: 1 }}>
+          <Text className="text-slate-100 text-xl font-bold mb-4">Additional Information</Text>
           
           <View className="space-y-3">
-            <View className="flex-row justify-between items-center py-3 border-b border-gray-100">
+            <View className="flex-row justify-between items-center py-3 border-b border-white/10">
               <View className="flex-row items-center">
-                <Ionicons name="speedometer-outline" size={20} color="#6B7280" />
-                <Text className="text-gray-600 ml-3">Surface Pressure</Text>
+                <Ionicons name="speedometer-outline" size={20} color={colors.textSubtle} />
+                <Text className="text-slate-300 ml-3">Surface Pressure</Text>
               </View>
-              <Text className="text-gray-900 font-semibold">{weatherData?.surfacePressure} hPa</Text>
+              <Text className="text-slate-100 font-semibold">{weatherData?.surfacePressure} hPa</Text>
             </View>
             
-            <View className="flex-row justify-between items-center py-3 border-b border-gray-100">
+            <View className="flex-row justify-between items-center py-3 border-b border-white/10">
               <View className="flex-row items-center">
-                <Ionicons name="speedometer-outline" size={20} color="#6B7280" />
-                <Text className="text-gray-600 ml-3">Pressure (MSL)</Text>
+                <Ionicons name="speedometer-outline" size={20} color={colors.textSubtle} />
+                <Text className="text-slate-300 ml-3">Pressure (MSL)</Text>
               </View>
-              <Text className="text-gray-900 font-semibold">{weatherData?.pressureMsl} hPa</Text>
+              <Text className="text-slate-100 font-semibold">{weatherData?.pressureMsl} hPa</Text>
             </View>
             
-            <View className="flex-row justify-between items-center py-3 border-b border-gray-100">
+            <View className="flex-row justify-between items-center py-3 border-b border-white/10">
               <View className="flex-row items-center">
-                <Ionicons name="water-outline" size={20} color="#6B7280" />
-                <Text className="text-gray-600 ml-3">Dew Point</Text>
+                <Ionicons name="water-outline" size={20} color={colors.textSubtle} />
+                <Text className="text-slate-300 ml-3">Dew Point</Text>
               </View>
-              <Text className="text-gray-900 font-semibold">{weatherData?.dewPoint}°C</Text>
+              <Text className="text-slate-100 font-semibold">{weatherData?.dewPoint}°C</Text>
             </View>
             
-            <View className="flex-row justify-between items-center py-3 border-b border-gray-100">
+            <View className="flex-row justify-between items-center py-3 border-b border-white/10">
               <View className="flex-row items-center">
-                <Ionicons name="rainy-outline" size={20} color="#6B7280" />
-                <Text className="text-gray-600 ml-3">Precipitation</Text>
+                <Ionicons name="rainy-outline" size={20} color={colors.textSubtle} />
+                <Text className="text-slate-300 ml-3">Precipitation</Text>
               </View>
-              <Text className="text-gray-900 font-semibold">{weatherData?.precipitation} mm</Text>
+              <Text className="text-slate-100 font-semibold">{weatherData?.precipitation} mm</Text>
             </View>
             
             <View className="flex-row justify-between items-center py-3">
               <View className="flex-row items-center">
-                <Ionicons name="location-outline" size={20} color="#6B7280" />
-                <Text className="text-gray-600 ml-3">Coordinates</Text>
+                <Ionicons name="location-outline" size={20} color={colors.textSubtle} />
+                <Text className="text-slate-300 ml-3">Coordinates</Text>
               </View>
-              <Text className="text-gray-900 font-semibold">
+              <Text className="text-slate-100 font-semibold">
                 {latitude.toFixed(4)}, {longitude.toFixed(4)}
               </Text>
             </View>
@@ -427,15 +429,15 @@ export default function TriggerDetails() {
         </View>
 
         {/* No Precipitation Message */}
-        <View className="mx-5 mt-2 bg-green-50 rounded-2xl p-4 mb-8 border border-green-200">
+        <View className="mx-5 mt-2 rounded-2xl p-4 mb-8 border" style={{ backgroundColor: 'rgba(53, 193, 161, 0.12)', borderColor: 'rgba(53, 193, 161, 0.4)' }}>
           <View className="flex-row items-center">
             <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-            <Text className="text-green-900 font-semibold ml-3 text-base">
+            <Text className="text-green-200 font-semibold ml-3 text-base">
               No precipitation within an hour
             </Text>
           </View>
         </View>
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }

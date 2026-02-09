@@ -6,6 +6,7 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/utils/supabase';
 import { AQICard } from '@/components/AQICard';
 import { LoadingScreen } from '@/components/LoadingScreen';
@@ -17,6 +18,7 @@ import PredictiveRiskAlert from '@/components/PredictiveRiskAlert';
 import { getRemainingDoses } from '@/utils/inhalerCounter';
 import { sendRedZoneAlert } from '@/utils/notificationService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, gradients } from '@/utils/theme';
 
 type InhalerTrigger = {
   id: string;
@@ -579,14 +581,15 @@ export default function Dashboard() {
           options={{
             title: 'Map',
             headerShown: true,
-            headerStyle: { backgroundColor: '#6366F1' },
-            headerTintColor: '#fff',
-            headerTitleStyle: { fontWeight: 'bold' },
+            headerStyle: { backgroundColor: colors.bg },
+            headerTintColor: colors.text,
+            headerTitleStyle: { fontWeight: '700', color: colors.text },
             headerRight: () => (
               <TouchableOpacity
                 onPress={handleInhalerConnect}
-                className="mr-4 bg-white/20 p-2 rounded-full">
-                <Ionicons name="bluetooth" size={24} color="white" />
+                className="mr-4 p-2 rounded-full"
+                style={{ backgroundColor: 'rgba(255, 255, 255, 0.12)', borderColor: colors.glassBorder, borderWidth: 1 }}>
+                <Ionicons name="bluetooth" size={24} color={colors.text} />
               </TouchableOpacity>
             ),
           }}
@@ -594,9 +597,9 @@ export default function Dashboard() {
 
         {/* Map Loading Overlay */}
         {!mapReady && (
-          <View className="absolute inset-0 bg-white items-center justify-center z-10">
-            <ActivityIndicator size="large" color="#6366F1" />
-            <Text className="text-gray-600 mt-4 text-base">Loading map...</Text>
+          <View className="absolute inset-0 items-center justify-center z-10" style={{ backgroundColor: colors.bg }}>
+            <ActivityIndicator size="large" color={colors.accent2} />
+            <Text style={{ color: colors.textMuted, marginTop: 16, fontSize: 16 }}>Loading map...</Text>
           </View>
         )}
 
@@ -613,8 +616,8 @@ export default function Dashboard() {
             }}
             onMapReady={() => setMapReady(true)}
             loadingEnabled
-            loadingIndicatorColor="#6366F1"
-            loadingBackgroundColor="#ffffff"
+            loadingIndicatorColor={colors.accent2}
+            loadingBackgroundColor={colors.bg}
             showsUserLocation
             showsMyLocationButton={false}
             showsCompass
@@ -684,39 +687,49 @@ export default function Dashboard() {
           {/* Risk Monitor Button */}
           <TouchableOpacity
             onPress={() => setRiskMonitorModalVisible(true)}
-            className="bg-yellow-500 w-16 h-16 rounded-full items-center justify-center shadow-2xl"
-            style={{ elevation: 8 }}>
+            className="w-16 h-16 rounded-full items-center justify-center shadow-2xl"
+            style={{ backgroundColor: colors.accent, elevation: 8 }}>
             <Ionicons name="shield-checkmark" size={32} color="white" />
           </TouchableOpacity>
           
           {/* API Test Button */}
           <TouchableOpacity
             onPress={() => setTestApisModalVisible(true)}
-            className="bg-purple-500 w-16 h-16 rounded-full items-center justify-center shadow-2xl"
-            style={{ elevation: 8 }}>
+            className="w-16 h-16 rounded-full items-center justify-center shadow-2xl"
+            style={{ backgroundColor: colors.accent2, elevation: 8 }}>
             <Ionicons name="flask" size={32} color="white" />
           </TouchableOpacity>
           
           <TouchableOpacity
             onPress={toggleHospitals}
-            className={`${showingHospitals ? 'bg-green-500' : 'bg-white'} w-16 h-16 rounded-full items-center justify-center shadow-2xl mb-3`}
-            style={{ elevation: 8 }}
+            className="w-16 h-16 rounded-full items-center justify-center shadow-2xl mb-3"
+            style={{
+              elevation: 8,
+              backgroundColor: showingHospitals ? colors.accent : 'rgba(255, 255, 255, 0.12)',
+              borderColor: colors.glassBorder,
+              borderWidth: 1,
+            }}
             disabled={loadingHospitals}>
             {loadingHospitals ? (
-              <ActivityIndicator size="small" color={showingHospitals ? 'white' : '#6366F1'} />
+              <ActivityIndicator size="small" color={showingHospitals ? 'white' : colors.text} />
             ) : (
               <Ionicons 
                 name="medical" 
                 size={32} 
-                color={showingHospitals ? 'white' : '#6366F1'} 
+                color={showingHospitals ? 'white' : colors.text} 
               />
             )}
           </TouchableOpacity>
           <TouchableOpacity
             onPress={centerOnLocation}
-            className="bg-white w-16 h-16 rounded-full items-center justify-center shadow-2xl"
-            style={{ elevation: 8 }}>
-            <Ionicons name="locate" size={32} color="#6366F1" />
+            className="w-16 h-16 rounded-full items-center justify-center shadow-2xl"
+            style={{
+              elevation: 8,
+              backgroundColor: 'rgba(255, 255, 255, 0.12)',
+              borderColor: colors.glassBorder,
+              borderWidth: 1,
+            }}>
+            <Ionicons name="locate" size={32} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -724,10 +737,12 @@ export default function Dashboard() {
         <View className="absolute self-center" style={{ bottom: triggerButtonOffset }}>
           <TouchableOpacity
             onPress={handleAddTrigger}
-            className="bg-red-500 px-10 py-5 rounded-full flex-row items-center shadow-2xl"
+            className="rounded-full flex-row items-center shadow-2xl overflow-hidden"
             style={{ elevation: 10 }}>
-            <Ionicons name="add-circle" size={32} color="white" />
-            <Text className="text-white font-bold text-lg ml-3">Record Trigger</Text>
+            <LinearGradient colors={gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingVertical: 16, paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="add-circle" size={28} color="white" />
+              <Text style={{ color: 'white', fontWeight: '700', fontSize: 16, marginLeft: 10 }}>Record Trigger</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -737,9 +752,11 @@ export default function Dashboard() {
           index={-1}
           snapPoints={['65%']}
           enablePanDownToClose
-          backgroundStyle={{ backgroundColor: '#F9FAFB' }}>
+          backgroundStyle={{ backgroundColor: colors.bgAlt }}>
           <View className="px-6 py-4">
-            <Text className="text-2xl font-bold text-gray-900 mb-4">Location Details</Text>
+            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700', marginBottom: 16 }}>
+              Location Details
+            </Text>
             {selectedTrigger && (
               <AQICard
                 aqi={selectedTrigger.aqi || 0}
@@ -750,7 +767,7 @@ export default function Dashboard() {
                 humidity={selectedTrigger.humidity || 0}
               />
             )}
-            <Text className="text-gray-500 text-sm mt-4 text-center">
+            <Text style={{ color: colors.textSubtle, fontSize: 12, marginTop: 16, textAlign: 'center' }}>
               Recorded on {selectedTrigger?.timestamp ? new Date(selectedTrigger.timestamp).toLocaleString() : ''}
             </Text>
           </View>
@@ -769,7 +786,7 @@ export default function Dashboard() {
                 <TouchableOpacity
                   onPress={() => setBluetoothModalVisible(false)}
                   style={styles.closeButton}>
-                  <Ionicons name="close-circle" size={32} color="#6366F1" />
+                  <Ionicons name="close-circle" size={32} color={colors.accent2} />
                 </TouchableOpacity>
               </View>
               
@@ -806,13 +823,13 @@ export default function Dashboard() {
           visible={testApisModalVisible}
           animationType="slide"
           onRequestClose={() => setTestApisModalVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+          <View style={{ flex: 1, backgroundColor: colors.bg }}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>API Test Suite</Text>
               <TouchableOpacity
                 onPress={() => setTestApisModalVisible(false)}
                 style={styles.closeButton}>
-                <Ionicons name="close-circle" size={32} color="#6366F1" />
+                <Ionicons name="close-circle" size={32} color={colors.accent2} />
               </TouchableOpacity>
             </View>
             <TestPredictiveRiskAPIs />
@@ -824,13 +841,13 @@ export default function Dashboard() {
           visible={riskMonitorModalVisible}
           animationType="slide"
           onRequestClose={() => setRiskMonitorModalVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+          <View style={{ flex: 1, backgroundColor: colors.bg }}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Risk Monitor</Text>
               <TouchableOpacity
                 onPress={() => setRiskMonitorModalVisible(false)}
                 style={styles.closeButton}>
-                <Ionicons name="close-circle" size={32} color="#6366F1" />
+                <Ionicons name="close-circle" size={32} color={colors.accent2} />
               </TouchableOpacity>
             </View>
             <PredictiveRiskAlert />
@@ -847,21 +864,22 @@ export default function Dashboard() {
             <View style={[styles.modalContainer, { maxHeight: 'auto', padding: 24 }]}>
               <View style={{ alignItems: 'center', marginBottom: 20 }}>
                 <View 
-                  className="bg-blue-500 w-20 h-20 rounded-full items-center justify-center mb-4"
+                  className="w-20 h-20 rounded-full items-center justify-center mb-4"
+                  style={{ backgroundColor: colors.accent2, elevation: 8 }}
                   style={{ elevation: 8 }}>
                   <Text style={{ fontSize: 32, fontWeight: 'bold', color: 'white' }}>
                     H
                   </Text>
                 </View>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1F2937', textAlign: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, textAlign: 'center', marginBottom: 8 }}>
                   {selectedHospital?.name}
                 </Text>
                 {selectedHospital?.vicinity && (
-                  <Text style={{ fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 14, color: colors.textMuted, textAlign: 'center', marginBottom: 8 }}>
                     {selectedHospital.vicinity}
                   </Text>
                 )}
-                <Text style={{ fontSize: 16, color: '#6366F1', fontWeight: '600' }}>
+                <Text style={{ fontSize: 16, color: colors.accent2, fontWeight: '600' }}>
                   {((selectedHospital?.distance || 0) / 1000).toFixed(2)} km away
                 </Text>
               </View>
@@ -869,7 +887,7 @@ export default function Dashboard() {
               <TouchableOpacity
                 onPress={navigateToHospital}
                 style={{
-                  backgroundColor: '#6366F1',
+                  backgroundColor: colors.accent2,
                   paddingVertical: 16,
                   paddingHorizontal: 32,
                   borderRadius: 12,
@@ -887,13 +905,13 @@ export default function Dashboard() {
               <TouchableOpacity
                 onPress={() => setDirectionModalVisible(false)}
                 style={{
-                  backgroundColor: '#E5E7EB',
+                  backgroundColor: 'rgba(255, 255, 255, 0.12)',
                   paddingVertical: 12,
                   paddingHorizontal: 32,
                   borderRadius: 12,
                   alignItems: 'center',
                 }}>
-                <Text style={{ color: '#4B5563', fontSize: 16, fontWeight: '600' }}>
+                <Text style={{ color: colors.textMuted, fontSize: 16, fontWeight: '600' }}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -903,9 +921,16 @@ export default function Dashboard() {
 
         {/* Inhaler Counter Badge */}
         <View style={{ position: 'absolute', top: insets.top + 12, right: 12 }}>
-          <View className="bg-white px-3 py-2 rounded-full shadow-md flex-row items-center" style={{ elevation: 4 }}>
-            <Ionicons name="medkit" size={16} color="#6366F1" />
-            <Text className="text-gray-900 font-bold ml-2">{remainingDoses}/30</Text>
+          <View
+            className="px-3 py-2 rounded-full shadow-md flex-row items-center"
+            style={{
+              elevation: 4,
+              backgroundColor: 'rgba(255, 255, 255, 0.12)',
+              borderColor: colors.glassBorder,
+              borderWidth: 1,
+            }}>
+            <Ionicons name="medkit" size={16} color={colors.accent2} />
+            <Text style={{ color: colors.text, fontWeight: '700', marginLeft: 8 }}>{remainingDoses}/30</Text>
           </View>
         </View>
       </View>
@@ -922,11 +947,13 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContainer: {
-    backgroundColor: 'white',
+    backgroundColor: colors.bgAlt,
     borderRadius: 24,
     width: '100%',
     maxHeight: '80%',
     overflow: 'hidden',
+    borderColor: colors.glassBorder,
+    borderWidth: 1,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -934,12 +961,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1F2937',
+    color: colors.text,
   },
   closeButton: {
     padding: 4,

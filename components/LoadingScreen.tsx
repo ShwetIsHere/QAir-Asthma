@@ -1,5 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, gradients } from '@/utils/theme';
 
 type LoadingScreenProps = {
   message?: string;
@@ -7,9 +9,9 @@ type LoadingScreenProps = {
 
 export const LoadingScreen = ({ message = 'Loading...' }: LoadingScreenProps) => {
   return (
-    <View className="flex-1 justify-center items-center bg-white">
-      <ActivityIndicator size="large" color="#6366F1" />
-      <Text className="text-gray-600 text-base mt-4">{message}</Text>
-    </View>
+    <LinearGradient colors={gradients.screen} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <ActivityIndicator size="large" color={colors.accent2} />
+      <Text style={{ color: colors.textMuted, fontSize: 16, marginTop: 16 }}>{message}</Text>
+    </LinearGradient>
   );
 };

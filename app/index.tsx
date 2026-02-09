@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { Text, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/utils/supabase';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, gradients } from '@/utils/theme';
 
 export default function Index() {
   useEffect(() => {
@@ -19,9 +21,11 @@ export default function Index() {
   };
 
   return (
-    <View className="flex-1 justify-center items-center bg-indigo-500">
-      <ActivityIndicator size="large" color="#fff" />
-      <Text className="text-white text-xl font-bold mt-4">Loading QAir...</Text>
-    </View>
+    <LinearGradient colors={gradients.screen} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <ActivityIndicator size="large" color={colors.accent2} />
+      <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700', marginTop: 16 }}>
+        Loading QAir...
+      </Text>
+    </LinearGradient>
   );
 }

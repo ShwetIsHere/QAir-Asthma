@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
 import { supabase } from '@/utils/supabase';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, gradients } from '@/utils/theme';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -54,83 +56,93 @@ export default function Login() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-gradient-to-b from-indigo-50 to-white">
-      <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView contentContainerClassName="flex-grow" showsVerticalScrollIndicator={false}>
-        <View className="flex-1 px-6 pt-20">
-          {/* Header */}
-          <View className="items-center mb-12">
-            <View className="bg-indigo-100 w-24 h-24 rounded-full items-center justify-center mb-6">
-              <Ionicons name="fitness" size={48} color="#6366F1" />
-            </View>
-            <Text className="text-4xl font-bold text-gray-900 mb-2">Welcome Back</Text>
-            <Text className="text-gray-500 text-base text-center">
-              Sign in to continue monitoring your asthma triggers
-            </Text>
-          </View>
-
-          {/* Form */}
-          <View className="mb-8">
-            <Input
-              label="Email Address"
-              placeholder="Enter your email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              icon="mail"
-              error={errors.email}
-            />
-
-            <Input
-              label="Password"
-              placeholder="Enter your password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              icon="lock-closed"
-              error={errors.password}
-            />
-
-            <TouchableOpacity className="items-end mb-6">
-              <Text className="text-indigo-600 font-semibold">Forgot Password?</Text>
-            </TouchableOpacity>
-
-            <Button
-              title={loading ? 'Signing In...' : 'Sign In'}
-              onPress={handleLogin}
-              disabled={loading}
-              className="mb-4"
-            />
-
-            {/* Social Login */}
-            <View className="flex-row items-center my-6">
-              <View className="flex-1 h-[1px] bg-gray-300" />
-              <Text className="text-gray-500 mx-4">or continue with</Text>
-              <View className="flex-1 h-[1px] bg-gray-300" />
+    <LinearGradient colors={gradients.screen} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScrollView contentContainerClassName="flex-grow" showsVerticalScrollIndicator={false}>
+          <View className="flex-1 px-6 pt-16 pb-10">
+            {/* Header */}
+            <View className="items-center mb-10">
+              <View
+                className="w-24 h-24 rounded-full items-center justify-center mb-6"
+                style={{ backgroundColor: 'rgba(255, 255, 255, 0.12)', borderColor: colors.glassBorder, borderWidth: 1 }}>
+                <Ionicons name="fitness" size={48} color={colors.accent2} />
+              </View>
+              <Text style={{ color: colors.text, fontSize: 30, fontWeight: '800', marginBottom: 6 }}>
+                Welcome Back
+              </Text>
+              <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: 'center' }}>
+                Sign in to continue monitoring your asthma triggers
+              </Text>
             </View>
 
-            <View className="flex-row justify-center space-x-4">
-              <TouchableOpacity className="bg-white border-2 border-gray-200 rounded-2xl p-4 w-20 items-center">
-                <Ionicons name="logo-google" size={28} color="#DB4437" />
+            {/* Form */}
+            <View
+              className="mb-8 rounded-3xl p-6"
+              style={{ backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1 }}>
+              <Input
+                label="Email Address"
+                placeholder="Enter your email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                icon="mail"
+                error={errors.email}
+              />
+
+              <Input
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                icon="lock-closed"
+                error={errors.password}
+              />
+
+              <TouchableOpacity className="items-end mb-6">
+                <Text style={{ color: colors.accent2, fontWeight: '600' }}>Forgot Password?</Text>
               </TouchableOpacity>
-              <TouchableOpacity className="bg-white border-2 border-gray-200 rounded-2xl p-4 w-20 items-center">
-                <Ionicons name="logo-apple" size={28} color="#000" />
+
+              <Button
+                title={loading ? 'Signing In...' : 'Sign In'}
+                onPress={handleLogin}
+                disabled={loading}
+                className="mb-4"
+              />
+
+              {/* Social Login */}
+              <View className="flex-row items-center my-6">
+                <View className="flex-1 h-[1px]" style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }} />
+                <Text style={{ color: colors.textSubtle, marginHorizontal: 12 }}>or continue with</Text>
+                <View className="flex-1 h-[1px]" style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }} />
+              </View>
+
+              <View className="flex-row justify-center space-x-4">
+                <TouchableOpacity
+                  className="rounded-2xl p-4 w-20 items-center"
+                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)', borderColor: colors.glassBorder, borderWidth: 1 }}>
+                  <Ionicons name="logo-google" size={26} color={colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="rounded-2xl p-4 w-20 items-center"
+                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)', borderColor: colors.glassBorder, borderWidth: 1 }}>
+                  <Ionicons name="logo-apple" size={26} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Sign Up Link */}
+            <View className="flex-row justify-center items-center pb-8">
+              <Text style={{ color: colors.textMuted }}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => router.push('/register')}>
+                <Text style={{ color: colors.accent, fontWeight: '700' }}>Sign Up</Text>
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Sign Up Link */}
-          <View className="flex-row justify-center items-center pb-8">
-            <Text className="text-gray-600">Don't have an account? </Text>
-            <TouchableOpacity onPress={() => router.push('/register')}>
-              <Text className="text-indigo-600 font-bold">Sign Up</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
