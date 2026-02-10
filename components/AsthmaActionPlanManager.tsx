@@ -151,19 +151,19 @@ export default function AsthmaActionPlanManager() {
 
   if (loading) {
     return (
-      <View className="bg-white rounded-2xl p-6">
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text className="text-gray-500 text-center mt-4">Loading action plan...</Text>
+      <View className="bg-white/10 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
+        <ActivityIndicator size="large" color="#818CF8" />
+        <Text className="text-slate-300 text-center mt-4">Loading action plan...</Text>
       </View>
     );
   }
 
   return (
-    <View className="bg-white rounded-2xl p-6">
+    <View className="bg-white/10 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
       <View className="flex-row items-center justify-between mb-4">
         <View className="flex-1">
-          <Text className="text-gray-900 text-xl font-bold">Asthma Action Plan</Text>
-          <Text className="text-gray-500 text-sm mt-1">
+          <Text className="text-slate-100 text-xl font-bold">Asthma Action Plan</Text>
+          <Text className="text-slate-300 text-sm mt-1">
             For emergency situations
           </Text>
         </View>
@@ -185,7 +185,7 @@ export default function AsthmaActionPlanManager() {
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
             <View className="w-4 h-4 rounded-full bg-green-500 mr-2" />
-            <Text className="text-gray-900 font-bold text-base">Green Zone - All Clear</Text>
+            <Text className="text-slate-100 font-bold text-base">Green Zone - All Clear</Text>
           </View>
           <TextInput
             value={greenZoneActions}
@@ -193,7 +193,7 @@ export default function AsthmaActionPlanManager() {
             placeholder="What to do when feeling well..."
             multiline
             numberOfLines={3}
-            className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-gray-900"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-100"
             placeholderTextColor="#9CA3AF"
             textAlignVertical="top"
           />
@@ -203,7 +203,7 @@ export default function AsthmaActionPlanManager() {
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
             <View className="w-4 h-4 rounded-full bg-yellow-500 mr-2" />
-            <Text className="text-gray-900 font-bold text-base">Yellow Zone - Caution</Text>
+            <Text className="text-slate-100 font-bold text-base">Yellow Zone - Caution</Text>
           </View>
           <TextInput
             value={yellowZoneActions}
@@ -211,7 +211,7 @@ export default function AsthmaActionPlanManager() {
             placeholder="What to do when symptoms worsen..."
             multiline
             numberOfLines={3}
-            className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-gray-900"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-100"
             placeholderTextColor="#9CA3AF"
             textAlignVertical="top"
           />
@@ -221,7 +221,7 @@ export default function AsthmaActionPlanManager() {
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
             <View className="w-4 h-4 rounded-full bg-red-500 mr-2" />
-            <Text className="text-gray-900 font-bold text-base">Red Zone - Emergency</Text>
+            <Text className="text-slate-100 font-bold text-base">Red Zone - Emergency</Text>
           </View>
           <TextInput
             value={redZoneActions}
@@ -229,7 +229,7 @@ export default function AsthmaActionPlanManager() {
             placeholder="Emergency actions to take..."
             multiline
             numberOfLines={3}
-            className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-gray-900"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-100"
             placeholderTextColor="#9CA3AF"
             textAlignVertical="top"
           />
@@ -238,8 +238,8 @@ export default function AsthmaActionPlanManager() {
         {/* Medications */}
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Ionicons name="medical" size={16} color="#6366F1" />
-            <Text className="text-gray-900 font-bold text-base ml-2">Medications</Text>
+            <Ionicons name="medical" size={16} color="#818CF8" />
+            <Text className="text-slate-100 font-bold text-base ml-2">Medications</Text>
           </View>
           <TextInput
             value={medications}
@@ -247,7 +247,7 @@ export default function AsthmaActionPlanManager() {
             placeholder="List your medications (daily and rescue)..."
             multiline
             numberOfLines={3}
-            className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-gray-900"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-100"
             placeholderTextColor="#9CA3AF"
             textAlignVertical="top"
           />
@@ -256,8 +256,8 @@ export default function AsthmaActionPlanManager() {
         {/* Allergies */}
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Ionicons name="alert-circle" size={16} color="#9333EA" />
-            <Text className="text-gray-900 font-bold text-base ml-2">Allergies</Text>
+            <Ionicons name="alert-circle" size={16} color="#C084FC" />
+            <Text className="text-slate-100 font-bold text-base ml-2">Allergies</Text>
           </View>
           <TextInput
             value={allergies}
@@ -265,7 +265,7 @@ export default function AsthmaActionPlanManager() {
             placeholder="List any allergies (medications, environmental, food)..."
             multiline
             numberOfLines={2}
-            className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 text-gray-900"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-100"
             placeholderTextColor="#9CA3AF"
             textAlignVertical="top"
           />
@@ -273,12 +273,12 @@ export default function AsthmaActionPlanManager() {
 
         {/* Doctor Information */}
         <View className="mb-4">
-          <Text className="text-gray-900 font-bold text-base mb-2">Doctor Information</Text>
+          <Text className="text-slate-100 font-bold text-base mb-2">Doctor Information</Text>
           <TextInput
             value={doctorName}
             onChangeText={setDoctorName}
             placeholder="Doctor's name"
-            className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 mb-3"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-100 mb-3"
             placeholderTextColor="#9CA3AF"
           />
           <TextInput
@@ -286,19 +286,19 @@ export default function AsthmaActionPlanManager() {
             onChangeText={setDoctorPhone}
             placeholder="Doctor's phone number"
             keyboardType="phone-pad"
-            className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-100"
             placeholderTextColor="#9CA3AF"
           />
         </View>
 
         {/* Hospital Information */}
         <View className="mb-6">
-          <Text className="text-gray-900 font-bold text-base mb-2">Hospital Information</Text>
+          <Text className="text-slate-100 font-bold text-base mb-2">Hospital Information</Text>
           <TextInput
             value={hospitalName}
             onChangeText={setHospitalName}
             placeholder="Hospital name"
-            className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 mb-3"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-100 mb-3"
             placeholderTextColor="#9CA3AF"
           />
           <TextInput
@@ -307,19 +307,19 @@ export default function AsthmaActionPlanManager() {
             placeholder="Hospital address"
             multiline
             numberOfLines={2}
-            className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
+            className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-100"
             placeholderTextColor="#9CA3AF"
             textAlignVertical="top"
           />
         </View>
 
         {/* Info Box */}
-        <View className="bg-blue-50 rounded-xl p-4 mb-4">
+        <View className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-4">
           <View className="flex-row items-center mb-2">
-            <Ionicons name="information-circle" size={20} color="#3B82F6" />
-            <Text className="text-blue-900 font-semibold ml-2">Important</Text>
+            <Ionicons name="information-circle" size={20} color="#60A5FA" />
+            <Text className="text-blue-300 font-semibold ml-2">Important</Text>
           </View>
-          <Text className="text-blue-800 text-sm leading-5">
+          <Text className="text-blue-200 text-sm leading-5">
             This action plan will be displayed during SOS emergencies for you and first responders. 
             Make sure it reflects your doctor's recommendations.
           </Text>

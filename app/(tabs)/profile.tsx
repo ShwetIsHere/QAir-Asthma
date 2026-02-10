@@ -471,18 +471,28 @@ export default function ProfilePage() {
   const yAxisConfig = useMemo(() => {
     const maxValue = Math.max(...weeklyData, 0);
     
-    if (maxValue <= 5) {
-      // For small values (0-5), show 0,1,2,3,4,5
+    if (maxValue === 0) {
+      return {
+        segments: 3,
+        yAxisSuffix: '',
+        fromZero: true,
+      };
+    } else if (maxValue <= 3) {
+      return {
+        segments: 3,
+        yAxisSuffix: '',
+        fromZero: true,
+      };
+    } else if (maxValue <= 5) {
       return {
         segments: 5,
         yAxisSuffix: '',
         fromZero: true,
       };
     } else {
-      // For larger values, round up to nearest 5 and show intervals of 5
-      const roundedMax = Math.ceil(maxValue / 5) * 5;
+      const segments = Math.min(Math.ceil(maxValue / 2), 5);
       return {
-        segments: Math.min(roundedMax / 5, 6), // Max 6 segments
+        segments: segments,
         yAxisSuffix: '',
         fromZero: true,
       };

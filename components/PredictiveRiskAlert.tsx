@@ -23,6 +23,7 @@ import {
   AppState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/utils/supabase';
 import { getCurrentLocation, requestBackgroundLocationPermission, getLocationPermissionStatus } from '@/utils/geofencing';
 import { fetchEnvironmentalData, EnvironmentalData } from '@/utils/environmentalDataAPI';
@@ -106,7 +107,6 @@ export default function PredictiveRiskAlert() {
         return;
       }
       setChecking(true);
-      console.log('=== Starting Risk Check ===');
 
       // Step 1: Get current user ID
       const { data: { user } } = await supabase.auth.getUser();
@@ -116,7 +116,6 @@ export default function PredictiveRiskAlert() {
       }
 
       // Step 2: Get current location
-      console.log('Step 1: Getting current location...');
       const location = await getCurrentLocation();
       if (!location) {
         Alert.alert(
@@ -127,10 +126,8 @@ export default function PredictiveRiskAlert() {
       }
 
       setCurrentLocation({ lat: location.latitude, lon: location.longitude });
-      console.log(`Location: ${location.latitude}, ${location.longitude}`);
 
       // Step 3: Fetch environmental data (AQI, weather, pollen)
-      console.log('Step 2: Fetching environmental data...');
       const envData = await fetchEnvironmentalData(location.latitude, location.longitude);
       if (!envData) {
         Alert.alert(
@@ -141,32 +138,16 @@ export default function PredictiveRiskAlert() {
       }
 
       setEnvironmentalData(envData);
-      console.log('Environmental data:', {
-        aqi: envData.aqi,
-        temp: envData.temperature,
-        humidity: envData.humidity,
-        pollen: envData.pollenLevel,
-      });
 
       // Step 4: Compare with trigger history
-      console.log('Step 3: Comparing with trigger history...');
       const assessment = await checkTriggerSimilarity(envData, user.id);
       setRiskAssessment(assessment);
       setLastCheckTime(new Date());
 
-      console.log('Risk Assessment:', {
-        isRisky: assessment.isRisky,
-        riskLevel: assessment.riskLevel,
-        score: assessment.similarityScore,
-        matchedTriggers: assessment.matchedTriggers.length,
-      });
-
       // Step 5: Display alert based on risk level
       displayRiskAlert(assessment, envData);
-
-      console.log('=== Risk Check Complete ===');
     } catch (error) {
-      console.error('Error in checkCurrentRisk:', error);
+      // Error handled silently
       Alert.alert('Error', 'Failed to check risk. Please try again.');
     } finally {
       setChecking(false);
@@ -187,9 +168,9 @@ export default function PredictiveRiskAlert() {
             setLastNotifyTs(now);
             await AsyncStorage.setItem('riskNotifyLastTs', String(now));
           })
-          .catch((e) => console.error('Notification send error', e));
-      } else {
-        console.log('Risk notification suppressed (cooldown active)');
+          .catch(() => {
+            // Notification error handled silently
+          });
       }
     }
     // Suppress modal alerts too if within cooldown window
@@ -206,7 +187,7 @@ export default function PredictiveRiskAlert() {
         `Risk Factors:\n${assessment.riskFactors.slice(0, 3).join('\n')}\n\n` +
         `Recommendations:\n${assessment.recommendations.slice(0, 2).join('\n')}`,
         [
-          { text: 'View Details', onPress: () => console.log('Show details') },
+          { text: 'View Details', onPress: () => {} },
           { text: 'OK', style: 'cancel' },
         ]
       );
@@ -345,10 +326,12 @@ export default function PredictiveRiskAlert() {
   };
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1" style={{ backgroundColor: '#0F172A' }}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View className="bg-indigo-600 p-6 pb-8 rounded-b-3xl">
+        <LinearGradient
+          colors={['#4F46E5', '#6366F1']}
+          className="p-6 pb-8 rounded-b-3xl">
           <View className="flex-row items-center mb-2">
             <Ionicons name="shield-checkmark" size={32} color="white" />
             <Text className="text-white text-2xl font-bold ml-3">Risk Monitor</Text>
@@ -356,22 +339,22 @@ export default function PredictiveRiskAlert() {
           <Text className="text-indigo-100 text-sm">
             Predictive alerts based on your trigger history
           </Text>
-        </View>
+        </LinearGradient>
 
         {/* Auto-Monitoring Toggle */}
-        <View className="bg-white mx-5 mt-5 rounded-2xl p-5 shadow-md" style={{ elevation: 4 }}>
+        <View className="bg-white/10 mx-5 mt-5 rounded-3xl p-5 shadow-md" style={{ elevation: 4, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
           <View className="flex-row items-center justify-between">
             <View className="flex-1 mr-4">
-              <Text className="text-gray-900 font-bold text-lg">Automatic Monitoring</Text>
-              <Text className="text-gray-500 text-sm mt-1">
+              <Text className="text-slate-100 font-bold text-lg">Automatic Monitoring</Text>
+              <Text className="text-slate-300 text-sm mt-1">
                 Get alerts when entering risky areas
               </Text>
             </View>
             <Switch
               value={monitoringEnabled}
               onValueChange={toggleMonitoring}
-              trackColor={{ false: '#D1D5DB', true: '#6366F1' }}
-              thumbColor={monitoringEnabled ? '#FFFFFF' : '#F3F4F6'}
+              trackColor={{ false: '#475569', true: '#6366F1' }}
+              thumbColor={monitoringEnabled ? '#FFFFFF' : '#CBD5E1'}
             />
           </View>
         </View>
@@ -380,33 +363,33 @@ export default function PredictiveRiskAlert() {
 
         {/* Current Risk Status */}
         {riskAssessment && (
-          <View className="bg-white mx-5 mt-5 rounded-2xl p-5 shadow-md" style={{ elevation: 4 }}>
-            <Text className="text-gray-900 font-bold text-xl mb-4">Current Risk Level</Text>
+          <View className="bg-white/10 mx-5 mt-5 rounded-3xl p-5 shadow-md" style={{ elevation: 4, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <Text className="text-slate-100 font-bold text-xl mb-4">Current Risk Level</Text>
             
             <View
               className="rounded-2xl p-6 mb-4"
-              style={{ backgroundColor: getRiskColor(riskAssessment.riskLevel) + '20' }}>
+              style={{ backgroundColor: getRiskColor(riskAssessment.riskLevel) + '30', borderWidth: 2, borderColor: getRiskColor(riskAssessment.riskLevel) }}>
               <View className="flex-row items-center justify-between mb-3">
                 <Text
                   className="font-bold text-2xl"
                   style={{ color: getRiskColor(riskAssessment.riskLevel) }}>
                   {riskAssessment.riskLevel.toUpperCase()}
                 </Text>
-                <Text className="text-gray-600 text-lg">{riskAssessment.similarityScore}% match</Text>
+                <Text className="text-slate-300 text-lg">{riskAssessment.similarityScore}% match</Text>
               </View>
               
-              <Text className="text-gray-700">
+              <Text className="text-slate-200">
                 {riskAssessment.matchedTriggers.length} similar trigger(s) found
               </Text>
             </View>
 
             {riskAssessment.riskFactors.length > 0 && (
               <View className="mb-4">
-                <Text className="text-gray-900 font-bold mb-2">Risk Factors:</Text>
+                <Text className="text-slate-100 font-bold mb-2">Risk Factors:</Text>
                 {riskAssessment.riskFactors.map((factor, index) => (
                   <View key={index} className="flex-row items-start mb-2">
-                    <Ionicons name="warning-outline" size={16} color="#F59E0B" style={{ marginTop: 2 }} />
-                    <Text className="text-gray-600 text-sm ml-2 flex-1">{factor}</Text>
+                    <Ionicons name="warning-outline" size={16} color="#FFA500" style={{ marginTop: 2 }} />
+                    <Text className="text-slate-300 text-sm ml-2 flex-1">{factor}</Text>
                   </View>
                 ))}
               </View>
@@ -414,11 +397,11 @@ export default function PredictiveRiskAlert() {
 
             {riskAssessment.recommendations.length > 0 && (
               <View>
-                <Text className="text-gray-900 font-bold mb-2">Recommendations:</Text>
+                <Text className="text-slate-100 font-bold mb-2">Recommendations:</Text>
                 {riskAssessment.recommendations.map((rec, index) => (
                   <View key={index} className="flex-row items-start mb-2">
                     <Ionicons name="checkmark-circle" size={16} color="#10B981" style={{ marginTop: 2 }} />
-                    <Text className="text-gray-600 text-sm ml-2 flex-1">{rec}</Text>
+                    <Text className="text-slate-300 text-sm ml-2 flex-1">{rec}</Text>
                   </View>
                 ))}
               </View>
@@ -428,18 +411,18 @@ export default function PredictiveRiskAlert() {
 
         {/* Environmental Data */}
         {environmentalData && (
-          <View className="bg-white mx-5 mt-5 rounded-2xl p-5 shadow-md" style={{ elevation: 4 }}>
-            <Text className="text-gray-900 font-bold text-xl mb-4">Current Conditions</Text>
+          <View className="bg-white/10 mx-5 mt-5 rounded-3xl p-5 shadow-md" style={{ elevation: 4, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+            <Text className="text-slate-100 font-bold text-xl mb-4">Current Conditions</Text>
             
             <View className="space-y-3">
               {/* AQI */}
-              <View className="flex-row items-center justify-between p-3 bg-gray-50 rounded-xl">
+              <View className="flex-row items-center justify-between p-3 bg-white/5 rounded-xl">
                 <View className="flex-row items-center">
-                  <Ionicons name="cloud" size={24} color="#6366F1" />
-                  <Text className="text-gray-700 font-semibold ml-3">Air Quality</Text>
+                  <Ionicons name="cloud" size={24} color="#818CF8" />
+                  <Text className="text-slate-200 font-semibold ml-3">Air Quality</Text>
                 </View>
                 <View className="items-end">
-                  <Text className="text-gray-900 font-bold text-lg">{environmentalData.aqi}</Text>
+                  <Text className="text-slate-100 font-bold text-lg">{environmentalData.aqi}</Text>
                   <Text
                     className="text-xs font-semibold"
                     style={{ color: getAQIInfo(environmentalData.aqi).color }}>
@@ -449,30 +432,30 @@ export default function PredictiveRiskAlert() {
               </View>
 
               {/* Temperature */}
-              <View className="flex-row items-center justify-between p-3 bg-gray-50 rounded-xl">
+              <View className="flex-row items-center justify-between p-3 bg-white/5 rounded-xl">
                 <View className="flex-row items-center">
                   <Ionicons name="thermometer" size={24} color="#F97316" />
-                  <Text className="text-gray-700 font-semibold ml-3">Temperature</Text>
+                  <Text className="text-slate-200 font-semibold ml-3">Temperature</Text>
                 </View>
-                <Text className="text-gray-900 font-bold text-lg">{environmentalData.temperature}°C</Text>
+                <Text className="text-slate-100 font-bold text-lg">{environmentalData.temperature}°C</Text>
               </View>
 
               {/* Humidity */}
-              <View className="flex-row items-center justify-between p-3 bg-gray-50 rounded-xl">
+              <View className="flex-row items-center justify-between p-3 bg-white/5 rounded-xl">
                 <View className="flex-row items-center">
                   <Ionicons name="water" size={24} color="#3B82F6" />
-                  <Text className="text-gray-700 font-semibold ml-3">Humidity</Text>
+                  <Text className="text-slate-200 font-semibold ml-3">Humidity</Text>
                 </View>
-                <Text className="text-gray-900 font-bold text-lg">{environmentalData.humidity}%</Text>
+                <Text className="text-slate-100 font-bold text-lg">{environmentalData.humidity}%</Text>
               </View>
 
               {/* Pollen */}
-              <View className="flex-row items-center justify-between p-3 bg-gray-50 rounded-xl">
+              <View className="flex-row items-center justify-between p-3 bg-white/5 rounded-xl">
                 <View className="flex-row items-center">
                   <Ionicons name="flower" size={24} color="#EC4899" />
-                  <Text className="text-gray-700 font-semibold ml-3">Pollen Level</Text>
+                  <Text className="text-slate-200 font-semibold ml-3">Pollen Level</Text>
                 </View>
-                <Text className="text-gray-900 font-bold text-lg capitalize">
+                <Text className="text-slate-100 font-bold text-lg capitalize">
                   {environmentalData.pollenLevel.replace('_', ' ')}
                 </Text>
               </View>
@@ -483,19 +466,19 @@ export default function PredictiveRiskAlert() {
         {/* Last Check Time */}
         {lastCheckTime && (
           <View className="mx-5 mt-3 mb-6">
-            <Text className="text-gray-400 text-sm text-center">
+            <Text className="text-slate-400 text-sm text-center">
               Last checked: {lastCheckTime.toLocaleTimeString()}
             </Text>
           </View>
         )}
 
         {/* Info Box */}
-        <View className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mx-5 mb-6">
+        <View className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 mx-5 mb-6">
           <View className="flex-row items-start">
-            <Ionicons name="information-circle" size={24} color="#3B82F6" />
+            <Ionicons name="information-circle" size={24} color="#60A5FA" />
             <View className="flex-1 ml-3">
-              <Text className="text-blue-900 font-bold mb-1">How it works</Text>
-              <Text className="text-blue-800 text-sm">
+              <Text className="text-blue-300 font-bold mb-1">How it works</Text>
+              <Text className="text-blue-200 text-sm">
                 This system compares current environmental conditions (AQI, temperature, humidity, pollen) 
                 with your past asthma trigger history using rule-based logic. No AI models used.
               </Text>

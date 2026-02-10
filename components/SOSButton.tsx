@@ -395,22 +395,23 @@ export default function SOSButton() {
       <TouchableOpacity
         onPress={handleSOSPress}
         disabled={loading || sosActivated}
-        className={`${
-          sosActivated ? 'bg-red-700' : 'bg-red-600'
-        } w-20 h-20 rounded-full items-center justify-center shadow-2xl border-4 border-white`}
+        className="w-16 h-16 rounded-full items-center justify-center shadow-2xl"
         style={{ 
-          elevation: 12,
+          backgroundColor: sosActivated ? '#DC2626' : '#EF4444',
+          elevation: 8,
           shadowColor: '#EF4444',
           shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.5,
-          shadowRadius: 8,
+          shadowOpacity: 0.4,
+          shadowRadius: 10,
+          borderColor: 'rgba(255, 255, 255, 0.2)',
+          borderWidth: 1,
         }}>
         {loading || sosActivated ? (
-          <ActivityIndicator size="large" color="white" />
+          <ActivityIndicator size="small" color="white" />
         ) : (
           <>
-            <Ionicons name="warning" size={36} color="white" />
-            <Text className="text-white font-bold text-xs mt-1">SOS</Text>
+            <Ionicons name="warning" size={32} color="white" />
+            <Text className="text-white font-bold text-xs">SOS</Text>
           </>
         )}
       </TouchableOpacity>

@@ -35,7 +35,7 @@ const initializeBLE = async () => {
     bleManager = new BleManager();
     return bleManager;
   } catch (error) {
-    console.warn('BLE not available:', error);
+    // BLE initialization failed - likely in Expo Go
     return null;
   }
 };
@@ -67,22 +67,6 @@ export default function BluetoothManager({
   const [bluetoothEnabled, setBluetoothEnabled] = useState(false);
   const [checkingBluetooth, setCheckingBluetooth] = useState(false);
   const [bleDataBuffer, setBleDataBuffer] = useState<string>(''); // Buffer for incomplete BLE data
-
-  // Debug: Log when available devices change
-  useEffect(() => {
-    console.log('Available devices updated:', availableDevices.length, availableDevices.map(d => d.name));
-  }, [availableDevices]);
-
-  // Debug: Log UI state
-  useEffect(() => {
-    console.log('UI State:', {
-      bluetoothEnabled,
-      checkingBluetooth,
-      isScanning,
-      isModalVisible,
-      deviceCount: availableDevices.length
-    });
-  }, [bluetoothEnabled, checkingBluetooth, isScanning, isModalVisible, availableDevices.length]);
 
   // Monitor Bluetooth state changes in real-time
   useEffect(() => {
@@ -135,7 +119,7 @@ export default function BluetoothManager({
           }
         }
       } catch (e) {
-        console.warn('Failed to rehydrate BLE connection state:', e);
+        // Failed to rehydrate connection state
       }
     };
 
@@ -175,7 +159,7 @@ export default function BluetoothManager({
       setBluetoothEnabled(enabled);
       return enabled;
     } catch (error) {
-      console.error('Error checking Bluetooth state:', error);
+      // Bluetooth state check error
       setBluetoothEnabled(false);
       return false;
     }
@@ -232,7 +216,7 @@ export default function BluetoothManager({
                   }
                 }, 3000);
               } catch (error) {
-                console.error('Error opening settings:', error);
+                // Error opening settings
                 setCheckingBluetooth(false);
                 Alert.alert(
                   'Error',
@@ -277,7 +261,7 @@ export default function BluetoothManager({
           return granted === 'granted';
         }
       } catch (err) {
-        console.warn('Bluetooth permission error:', err);
+        // Bluetooth permission error
         return false;
       }
     }
@@ -310,8 +294,6 @@ export default function BluetoothManager({
 
     try {
       // Start real BLE scanning
-      console.log('Starting BLE scan...');
-
       const manager = await initializeBLE();
       if (!manager) {
         setIsScanning(false);
@@ -327,7 +309,7 @@ export default function BluetoothManager({
         { allowDuplicates: false }, // don't report same device multiple times
         (error: any, device: any) => {
           if (error) {
-            console.error('Scan error:', error);
+            // Scan error handled silently
             setIsScanning(false);
             Alert.alert('Scan Error', 'Failed to scan for devices. Please try again.');
             return;
@@ -336,7 +318,6 @@ export default function BluetoothManager({
           if (device) {
             // Use device name or ID as fallback
             const deviceName = device.name || device.localName || `Unknown Device (${device.id.slice(0, 8)}...)`;
-            console.log('Found device:', deviceName, device.id);
             
             const newDevice: BluetoothDevice = {
               id: device.id,
@@ -356,7 +337,6 @@ export default function BluetoothManager({
 
       // Stop scanning after 10 seconds and cleanup
       setTimeout(async () => {
-        console.log('Stopping BLE scan...');
         const manager = await initializeBLE();
         if (manager) {
           manager.stopDeviceScan();
@@ -366,7 +346,7 @@ export default function BluetoothManager({
         discoveredDevices.clear();
       }, 10000);
     } catch (error) {
-      console.error('Error starting scan:', error);
+      // Scan startup error handled silently
       setIsScanning(false);
       Alert.alert('Error', 'Failed to start Bluetooth scan.');
     }
@@ -387,30 +367,20 @@ export default function BluetoothManager({
       // Stop scanning before connecting
       manager.stopDeviceScan();
       
-      console.log('Connecting to device:', device.name);
-      
       // Connect to the BLE device
       const connectedBleDevice = await manager.connectToDevice(device.id);
-      console.log('Connected! Discovering services...');
       
       // Discover all services and characteristics
       await connectedBleDevice.discoverAllServicesAndCharacteristics();
-      console.log('Services discovered');
       
       // Monitor ESP32 Inhaler Triggers
       if (device.name === 'QAir-Inhaler' || device.name?.includes('QAir')) {
-        console.log('🔵 Setting up ESP32 inhaler monitoring...');
-        console.log('🔵 Service UUID: 4fafc201-1fb5-459e-8fcc-c5c9c331914b');
-        console.log('🔵 Characteristic UUID: beb5483e-36e1-4688-b7f5-ea07361b26a8');
-        
         connectedBleDevice.monitorCharacteristicForService(
           '4fafc201-1fb5-459e-8fcc-c5c9c331914b', // SERVICE_UUID
           'beb5483e-36e1-4688-b7f5-ea07361b26a8', // TRIGGER_CHAR_UUID
           async (error: any, characteristic: any) => {
-            console.log('🔵 BLE notification callback triggered!');
-            
             if (error) {
-              console.error('❌ BLE monitoring error:', error);
+              // BLE monitoring error handled silently
               return;
             }
             
@@ -419,8 +389,6 @@ export default function BluetoothManager({
                 // Decode base64 BLE data
                 const base64Data = characteristic.value;
                 const decodedData = atob(base64Data);
-                
-                console.log('📨 ESP32 data received:', decodedData);
                 
                 // Parse short format: "T,fsrValue,count" (e.g., "T,856,1")
                 const parts = decodedData.split(',');
@@ -432,23 +400,15 @@ export default function BluetoothManager({
                     count: parseInt(parts[2])
                   };
                   
-                  console.log('✅ ESP32 Trigger parsed:', triggerData);
-                  
                   // Record trigger with location and air quality
                   await recordInhalerTrigger(triggerData);
-                } else {
-                  console.warn('⚠️ Unknown BLE data format:', decodedData);
                 }
               } catch (e) {
-                console.error('❌ Error processing BLE data:', e);
+                // BLE data processing error handled silently
               }
-            } else {
-              console.warn('⚠️ BLE notification received but no value');
             }
           }
         );
-        
-        console.log('✅ Monitoring active for inhaler triggers');
       }
       
       const connectedDeviceData: BluetoothDevice = {
@@ -483,7 +443,7 @@ export default function BluetoothManager({
         onDeviceConnected(connectedDeviceData);
       }
     } catch (error) {
-      console.error('Connection error:', error);
+      // Connection error handled silently
       setIsScanning(false);
       Alert.alert(
         'Connection Failed',
@@ -496,12 +456,9 @@ export default function BluetoothManager({
   // Record inhaler trigger in Supabase with location and air quality
   const recordInhalerTrigger = async (triggerData: any) => {
     try {
-      console.log('Recording inhaler trigger...');
-      
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.error('No user logged in');
         Alert.alert('Error', 'Please log in to record inhaler usage');
         return;
       }
@@ -509,7 +466,6 @@ export default function BluetoothManager({
       // Get GPS location
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        console.error('Location permission denied');
         Alert.alert('Permission Required', 'Please enable location to record inhaler usage');
         return;
       }
@@ -517,11 +473,8 @@ export default function BluetoothManager({
       const location = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = location.coords;
       
-      console.log('Location:', latitude, longitude);
-      
       // Fetch air quality data
       const airQuality = await fetchAirQuality(latitude, longitude);
-      console.log('Air quality:', airQuality.aqi);
       
       // Insert into Supabase
       const { data, error } = await supabase
@@ -540,12 +493,10 @@ export default function BluetoothManager({
         });
       
       if (error) {
-        console.error('Supabase insert error:', error);
         Alert.alert('Error', 'Failed to record inhaler usage');
         return;
       }
       
-      console.log('✓ Trigger recorded in Supabase');
       Alert.alert(
         'Inhaler Use Recorded',
         `Trigger #${triggerData.count} recorded at ${airQuality.category} air quality (AQI: ${airQuality.aqi})`
@@ -562,7 +513,7 @@ export default function BluetoothManager({
         onTriggerRecorded();
       }
     } catch (error) {
-      console.error('Error recording trigger:', error);
+      // Trigger recording error handled silently
       Alert.alert('Error', 'Failed to record inhaler usage');
     }
   };
@@ -580,11 +531,9 @@ export default function BluetoothManager({
           onPress: async () => {
             try {
               if (connectedDevice) {
-                console.log('Disconnecting from:', connectedDevice.name);
                 const manager = await initializeBLE();
                 if (manager) {
                   await manager.cancelDeviceConnection(connectedDevice.id);
-                  console.log('Disconnected successfully');
                 }
               }
               
@@ -597,7 +546,7 @@ export default function BluetoothManager({
               
               Alert.alert('Disconnected', 'Device has been disconnected.');
             } catch (error) {
-              console.error('Disconnect error:', error);
+              // Disconnect error handled
               // Still clear the connection even if there's an error
               setConnectedDevice(null);
               if (onDeviceDisconnected) {
@@ -884,14 +833,16 @@ const styles = StyleSheet.create({
     marginVertical: 15,
   },
   statusCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 20,
     padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   statusHeader: {
     flexDirection: 'row',
@@ -901,11 +852,11 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#E7F1FF',
     marginLeft: 10,
   },
   statusTable: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     padding: 15,
     marginBottom: 15,
@@ -916,17 +867,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   tableLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
+    color: '#A9B7CC',
   },
   tableValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#E7F1FF',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -963,13 +914,13 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#1E293B',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: '75%',
     paddingBottom: 10,
   },
@@ -979,13 +930,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 20,
-    borderTopLeftRadius: 20,
+    borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: 'white',
+    color: '#E7F1FF',
   },
   closeButton: {
     padding: 4,
@@ -996,7 +947,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: 15,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
     marginHorizontal: 15,
     marginTop: 10,
     borderRadius: 10,
@@ -1004,7 +955,7 @@ const styles = StyleSheet.create({
   scanningText: {
     marginLeft: 8,
     fontSize: 13,
-    color: '#6366F1',
+    color: '#818CF8',
     fontWeight: '600',
   },
   deviceList: {
@@ -1019,19 +970,19 @@ const styles = StyleSheet.create({
   deviceItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   deviceIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -1042,12 +993,12 @@ const styles = StyleSheet.create({
   deviceName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#E7F1FF',
     marginBottom: 3,
   },
   deviceId: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: '#A9B7CC',
   },
   signalContainer: {
     flexDirection: 'row',
@@ -1072,12 +1023,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6B7280',
+    color: '#A9B7CC',
     marginTop: 12,
   },
   emptySubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#6B7280',
     textAlign: 'center',
     marginTop: 8,
   },
@@ -1093,13 +1044,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 2,
     borderColor: '#6366F1',
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
     gap: 6,
   },
   rescanButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#6366F1',
+    color: '#818CF8',
   },
   bluetoothCheckContainer: {
     justifyContent: 'center',
@@ -1110,12 +1061,12 @@ const styles = StyleSheet.create({
   bluetoothCheckText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6366F1',
+    color: '#818CF8',
     marginTop: 16,
   },
   bluetoothCheckSubtext: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: '#A9B7CC',
     textAlign: 'center',
     marginTop: 8,
   },
@@ -1128,12 +1079,12 @@ const styles = StyleSheet.create({
   bluetoothDisabledText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#F59E0B',
+    color: '#FFA500',
     marginTop: 12,
   },
   bluetoothDisabledSubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#A9B7CC',
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 20,
@@ -1143,10 +1094,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6366F1',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
     borderRadius: 12,
     gap: 8,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   enableBluetoothButtonText: {
     color: 'white',

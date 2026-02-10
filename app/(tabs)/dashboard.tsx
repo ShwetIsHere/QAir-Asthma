@@ -69,23 +69,22 @@ export default function Dashboard() {
   const mapRef = useRef<MapView>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
   const lastRedZoneAlertRef = useRef<{ zoneId: string; timestamp: number } | null>(null);
+  const hasAutoLocatedRef = useRef(false);
   const RED_ZONE_RADIUS_METERS = 500;
   const RED_ZONE_ALERT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
   const mapBottomPadding = 350 + insets.bottom;
   const floatingButtonOffset = 64 + insets.bottom;
   const triggerButtonOffset = 60 + insets.bottom;
 
-  // Debug: Monitor hospitals state changes
+  // Auto-center map on user location when map is ready
   useEffect(() => {
-    console.log('🔄 STATE CHANGE - hospitals:', hospitals.length, 'showingHospitals:', showingHospitals, 'loadingHospitals:', loadingHospitals);
-    if (hospitals.length > 0) {
-      console.log('🏥 Hospitals in state:', hospitals.map(h => ({ name: h.name, lat: h.latitude, lng: h.longitude })));
+    if (mapReady && location && mapRef.current && !hasAutoLocatedRef.current) {
+      hasAutoLocatedRef.current = true;
+      setTimeout(() => {
+        centerOnLocation();
+      }, 500);
     }
-  }, [hospitals, showingHospitals, loadingHospitals]);
-
-  useEffect(() => {
-    console.log('🏥 Hospitals state changed:', hospitals.length, 'Showing:', showingHospitals);
-  }, [hospitals, showingHospitals]);
+  }, [mapReady, location]);
 
   useEffect(() => {
     let isMounted = true;
@@ -222,12 +221,12 @@ export default function Dashboard() {
         .order('timestamp', { ascending: false });
 
       if (error) {
-        console.error('Error loading triggers:', error);
+        // Error handled silently for performance
       } else if (data) {
         setTriggers(data);
       }
     } catch (error) {
-      console.error('Error loading triggers:', error);
+      // Error handled silently for performance
     }
   };
 
@@ -310,7 +309,9 @@ export default function Dashboard() {
 
       if (!lastAlert || lastAlert.zoneId !== zoneId || now - lastAlert.timestamp > RED_ZONE_ALERT_COOLDOWN_MS) {
         lastRedZoneAlertRef.current = { zoneId, timestamp: now };
-        sendRedZoneAlert(activeZone.count).catch((error) => console.error('Failed to send red zone alert', error));
+        sendRedZoneAlert(activeZone.count).catch(() => {
+          // Red zone alert error handled silently
+        });
       }
     } else {
       lastRedZoneAlertRef.current = null;
@@ -399,10 +400,7 @@ export default function Dashboard() {
   };
 
   const fetchNearbyHospitals = async () => {
-    console.log('🏥 fetchNearbyHospitals called');
-
     if (!location) {
-      console.log('❌ No location available');
       Alert.alert('Error', 'Location not available');
       return;
     }
@@ -432,7 +430,6 @@ export default function Dashboard() {
 
     for (const endpoint of overpassEndpoints) {
       const url = `${endpoint}?data=${encodeURIComponent(query)}`;
-      console.log('📡 Trying Overpass endpoint:', endpoint);
       try {
         const response = await fetch(url, {
           headers: {
@@ -443,13 +440,10 @@ export default function Dashboard() {
         const contentType = response.headers.get('content-type') || '';
         const text = await response.text();
         if (!response.ok) {
-          console.warn('⚠️ Non-OK response:', response.status, text.slice(0, 120));
           lastError = new Error(`Endpoint ${endpoint} returned ${response.status}`);
           continue;
         }
         if (!contentType.includes('application/json')) {
-          // Likely HTML error page -> skip
-          console.warn('⚠️ Unexpected content-type (expect JSON):', contentType, 'First chars:', text.slice(0, 60));
           lastError = new Error('Unexpected content type');
           continue;
         }
@@ -457,24 +451,19 @@ export default function Dashboard() {
           parsed = JSON.parse(text);
           break; // success
         } catch (jsonErr) {
-          console.error('❌ JSON parse failed for endpoint', endpoint, jsonErr);
           lastError = jsonErr;
         }
       } catch (err) {
-        console.error('❌ Fetch error for endpoint', endpoint, err);
         lastError = err;
         continue;
       }
     }
 
     if (!parsed) {
-      console.error('❌ All Overpass attempts failed:', lastError);
       Alert.alert('Error', 'Failed to fetch hospitals (Overpass unavailable). Please try again later.');
       setLoadingHospitals(false);
       return;
     }
-
-    console.log('📦 Data parsed, elements:', parsed.elements?.length || 0);
     if (parsed.elements && parsed.elements.length > 0) {
       const hospitalList = parsed.elements
         .map((element: any) => {
@@ -514,23 +503,14 @@ export default function Dashboard() {
   };
 
   const toggleHospitals = async () => {
-    console.log('🔘 Toggle button pressed');
-    console.log('Current state - loadingHospitals:', loadingHospitals, 'showingHospitals:', showingHospitals, 'hospitals.length:', hospitals.length);
-    
-    if (loadingHospitals) {
-      console.log('⏳ Already loading, ignoring...');
-      return;
-    }
+    if (loadingHospitals) return;
 
     if (showingHospitals) {
-      console.log('👻 Hiding hospitals');
       setHospitals([]);
       setShowingHospitals(false);
     } else {
-      console.log('👀 Showing hospitals - starting fetch...');
       setLoadingHospitals(true);
       await fetchNearbyHospitals();
-      console.log('✅ Fetch complete, final state - hospitals.length:', hospitals.length, 'showingHospitals:', showingHospitals);
     }
   };
 
@@ -659,7 +639,6 @@ export default function Dashboard() {
 
             {/* Hospital Markers */}
             {showingHospitals && hospitals.map((facility) => {
-              console.log('🏥 Rendering marker for:', facility.name, 'at', facility.latitude, facility.longitude);
               return (
               <Marker
                 key={facility.id}
@@ -678,59 +657,70 @@ export default function Dashboard() {
         )}
 
         {/* Floating Action Buttons */}
-        <View className="absolute right-6 space-y-3" style={{ bottom: floatingButtonOffset }}>
-          {/* SOS Button */}
-          <SOSButton />
-          
-          <View className="h-4" />
-          
-          {/* Risk Monitor Button */}
+        <View className="absolute right-5" style={{ bottom: floatingButtonOffset, gap: 12 }}>
+          {/* Locate Button */}
           <TouchableOpacity
-            onPress={() => setRiskMonitorModalVisible(true)}
+            onPress={centerOnLocation}
             className="w-16 h-16 rounded-full items-center justify-center shadow-2xl"
-            style={{ backgroundColor: colors.accent, elevation: 8 }}>
-            <Ionicons name="shield-checkmark" size={32} color="white" />
+            style={{
+              elevation: 8,
+              backgroundColor: '#35C1A1',
+              borderColor: 'rgba(255, 255, 255, 0.2)',
+              borderWidth: 1,
+            }}>
+            <Ionicons name="locate" size={32} color="white" />
+          </TouchableOpacity>
+
+          {/* Hospital Button */}
+          <TouchableOpacity
+            onPress={toggleHospitals}
+            className="w-16 h-16 rounded-full items-center justify-center shadow-2xl"
+            style={{
+              elevation: 8,
+              backgroundColor: showingHospitals ? '#3B82F6' : '#6B7280',
+              borderColor: 'rgba(255, 255, 255, 0.2)',
+              borderWidth: 1,
+            }}
+            disabled={loadingHospitals}>
+            {loadingHospitals ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Ionicons 
+                name="medical" 
+                size={32} 
+                color="white" 
+              />
+            )}
           </TouchableOpacity>
           
           {/* API Test Button */}
           <TouchableOpacity
             onPress={() => setTestApisModalVisible(true)}
             className="w-16 h-16 rounded-full items-center justify-center shadow-2xl"
-            style={{ backgroundColor: colors.accent2, elevation: 8 }}>
+            style={{ 
+              backgroundColor: '#60A5FA', 
+              elevation: 8,
+              borderColor: 'rgba(255, 255, 255, 0.2)',
+              borderWidth: 1,
+            }}>
             <Ionicons name="flask" size={32} color="white" />
           </TouchableOpacity>
           
+          {/* Risk Monitor Button */}
           <TouchableOpacity
-            onPress={toggleHospitals}
-            className="w-16 h-16 rounded-full items-center justify-center shadow-2xl mb-3"
-            style={{
-              elevation: 8,
-              backgroundColor: showingHospitals ? colors.accent : 'rgba(255, 255, 255, 0.12)',
-              borderColor: colors.glassBorder,
-              borderWidth: 1,
-            }}
-            disabled={loadingHospitals}>
-            {loadingHospitals ? (
-              <ActivityIndicator size="small" color={showingHospitals ? 'white' : colors.text} />
-            ) : (
-              <Ionicons 
-                name="medical" 
-                size={32} 
-                color={showingHospitals ? 'white' : colors.text} 
-              />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={centerOnLocation}
+            onPress={() => setRiskMonitorModalVisible(true)}
             className="w-16 h-16 rounded-full items-center justify-center shadow-2xl"
-            style={{
+            style={{ 
+              backgroundColor: '#10B981', 
               elevation: 8,
-              backgroundColor: 'rgba(255, 255, 255, 0.12)',
-              borderColor: colors.glassBorder,
+              borderColor: 'rgba(255, 255, 255, 0.2)',
               borderWidth: 1,
             }}>
-            <Ionicons name="locate" size={32} color={colors.text} />
+            <Ionicons name="shield-checkmark" size={32} color="white" />
           </TouchableOpacity>
+          
+          {/* SOS Button */}
+          <SOSButton />
         </View>
 
         {/* Add Trigger Button */}
@@ -792,7 +782,6 @@ export default function Dashboard() {
               
               <BluetoothManager
                 onDeviceConnected={(device) => {
-                  console.log('Device connected:', device);
                   setBluetoothModalVisible(false);
                   Alert.alert(
                     'Connected!',
@@ -801,7 +790,7 @@ export default function Dashboard() {
                   );
                 }}
                 onDeviceDisconnected={() => {
-                  console.log('Device disconnected');
+                  // Device disconnected
                 }}
                 onTriggerRecorded={async () => {
                   // Refresh triggers list and remaining doses after a physical trigger

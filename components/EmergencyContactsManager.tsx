@@ -184,19 +184,19 @@ export default function EmergencyContactsManager() {
 
   if (loading) {
     return (
-      <View className="bg-white rounded-2xl p-6">
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text className="text-gray-500 text-center mt-4">Loading contacts...</Text>
+      <View className="bg-white/10 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
+        <ActivityIndicator size="large" color="#818CF8" />
+        <Text className="text-slate-300 text-center mt-4">Loading contacts...</Text>
       </View>
     );
   }
 
   return (
-    <View className="bg-white rounded-2xl p-6">
+    <View className="bg-white/10 rounded-3xl p-6 shadow-md" style={{ elevation: 4 }}>
       <View className="flex-row items-center justify-between mb-4">
         <View className="flex-1">
-          <Text className="text-gray-900 text-xl font-bold">Emergency Contacts</Text>
-          <Text className="text-gray-500 text-sm mt-1">
+          <Text className="text-slate-100 text-xl font-bold">Emergency Contacts</Text>
+          <Text className="text-slate-300 text-sm mt-1">
             Contacts for SOS alerts
           </Text>
         </View>
@@ -211,9 +211,9 @@ export default function EmergencyContactsManager() {
 
       {contacts.length === 0 ? (
         <View className="py-8 items-center">
-          <Ionicons name="people-outline" size={48} color="#D1D5DB" />
-          <Text className="text-gray-400 mt-2">No emergency contacts yet</Text>
-          <Text className="text-gray-400 text-xs mt-1">Add contacts for SOS alerts</Text>
+          <Ionicons name="people-outline" size={48} color="#A9B7CC" />
+          <Text className="text-slate-400 mt-2">No emergency contacts yet</Text>
+          <Text className="text-slate-400 text-xs mt-1">Add contacts for SOS alerts</Text>
         </View>
       ) : (
         <ScrollView 
@@ -223,37 +223,37 @@ export default function EmergencyContactsManager() {
           {contacts.map((contact) => (
             <View
               key={contact.id}
-              className="flex-row items-center justify-between py-4 border-b border-gray-100">
+              className="flex-row items-center justify-between py-4 border-b border-white/10">
               <View className="flex-1 flex-row items-center">
-                <View className="bg-indigo-50 w-12 h-12 rounded-full items-center justify-center mr-3">
-                  <Ionicons name="person" size={24} color="#6366F1" />
+                <View className="bg-white/10 w-12 h-12 rounded-full items-center justify-center mr-3">
+                  <Ionicons name="person" size={24} color="#818CF8" />
                 </View>
                 <View className="flex-1">
                   <View className="flex-row items-center">
-                    <Text className="text-gray-900 font-semibold text-base">
+                    <Text className="text-slate-100 font-semibold text-base">
                       {contact.name}
                     </Text>
                     {contact.is_primary && (
-                      <View className="bg-green-100 px-2 py-1 rounded-md ml-2">
-                        <Text className="text-green-700 text-xs font-semibold">Primary</Text>
+                      <View className="bg-green-500/20 px-2 py-1 rounded-md ml-2">
+                        <Text className="text-green-400 text-xs font-semibold">Primary</Text>
                       </View>
                     )}
                   </View>
-                  <Text className="text-gray-600 text-sm mt-1">{contact.phone_number}</Text>
+                  <Text className="text-slate-300 text-sm mt-1">{contact.phone_number}</Text>
                   {contact.relationship && (
-                    <Text className="text-gray-400 text-xs mt-1">{contact.relationship}</Text>
+                    <Text className="text-slate-400 text-xs mt-1">{contact.relationship}</Text>
                   )}
                 </View>
               </View>
               <View className="flex-row">
                 <TouchableOpacity
                   onPress={() => openEditModal(contact)}
-                  className="bg-blue-50 p-2 rounded-lg mr-2">
-                  <Ionicons name="pencil" size={20} color="#3B82F6" />
+                  className="bg-blue-500/20 p-2 rounded-lg mr-2">
+                  <Ionicons name="pencil" size={20} color="#60A5FA" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => deleteContact(contact.id)}
-                  className="bg-red-50 p-2 rounded-lg">
+                  className="bg-red-500/20 p-2 rounded-lg">
                   <Ionicons name="trash" size={20} color="#EF4444" />
                 </TouchableOpacity>
               </View>
