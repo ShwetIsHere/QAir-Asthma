@@ -1,0 +1,205 @@
+/**
+ * SYSTEM FLOW DIAGRAM
+ * Complete data flow through QAir architecture
+ */
+
+/*
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                           QAIR SYSTEM ARCHITECTURE                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                               DEVICE LAYER                                    │
+│                           ┌──────────────┐                                   │
+│                           │ ESP32 Inhaler│                                   │
+│                           │  FSR Sensor  │                                   │
+│                           │  BLE Service │                                   │
+│                           └──────┬───────┘                                   │
+│                                  │ BLE Notification                          │
+│                                  │ (trigger event)                           │
+└──────────────────────────────────┼───────────────────────────────────────────┘
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            CLIENT LAYER (React Native)                        │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ BLE MANAGER (client/ble/BLEManager.ts)                                 │  │
+│  │  • Receives trigger notification                                       │  │
+│  │  • Decodes BLE data                                                    │  │
+│  │  • Enriches with location & environment                                │  │
+│  └──────────────────┬─────────────────────────────────────────────────────┘  │
+│                     │ Immediate storage                                      │
+│                     ▼                                                        │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ LOCAL SQLite DATABASE (client/database/LocalDatabase.ts)              │  │
+│  │                                                                        │  │
+│  │  ┌──────────────┐         ┌──────────────────┐                        │  │
+│  │  │   triggers   │         │  pending_sync    │                        │  │
+│  │  │  - timestamp │         │  - operation     │                        │  │
+│  │  │  - fsr_value │         │  - payload       │                        │  │
+│  │  │  - location  │         │  - retry_count   │                        │  │
+│  │  │  - synced=0  │         │  - created_at    │                        │  │
+│  │  └──────────────┘         └──────────────────┘                        │  │
+│  │                                                                        │  │
+│  │  Benefits:                                                             │  │
+│  │  ✅ Works offline                                                      │  │
+│  │  ✅ Instant response                                                   │  │
+│  │  ✅ Data never lost                                                    │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                     │                                                        │
+│                     │ Background process                                     │
+│                     ▼                                                        │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ BACKGROUND SYNC SERVICE (client/sync/BackgroundSyncService.ts)        │  │
+│  │                                                                        │  │
+│  │  Workflow:                                                             │  │
+│  │  1. Check network connectivity                                        │  │
+│  │  2. Get unsynced triggers from SQLite                                 │  │
+│  │  3. Batch upload (10 at a time)                                       │  │
+│  │  4. Retry failed syncs with exponential backoff                       │  │
+│  │  5. Mark as synced in SQLite                                          │  │
+│  │                                                                        │  │
+│  │  Features:                                                             │  │
+│  │  • Runs every 15 minutes                                              │  │
+│  │  • Network-aware                                                      │  │
+│  │  • Max 5 retry attempts                                               │  │
+│  │  • 500ms delay between uploads                                        │  │
+│  └────────────────┬───────────────────────────────────────────────────────┘  │
+│                   │ HTTPS POST                                               │
+└───────────────────┼──────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         CLOUD LAYER (Supabase)                               │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ EDGE FUNCTION: process-trigger                                        │  │
+│  │ (supabase/functions/process-trigger/index.ts)                         │  │
+│  │                                                                        │  │
+│  │  1. Validate payload                                                  │  │
+│  │  2. Authenticate user                                                 │  │
+│  │  3. Enrich with user_id                                               │  │
+│  │  4. INSERT into triggers table                                        │  │
+│  │  5. Fire downstream processing (async)                                │  │
+│  └──────────┬─────────────────────────────────────────────────────────────┘  │
+│             │                                                                │
+│             ├────────────────┬──────────────────┐                            │
+│             ▼                ▼                  ▼                            │
+│  ┌──────────────────┐ ┌─────────────────┐ ┌────────────────┐               │
+│  │ aggregate-weather│ │  analyze-risk   │ │ PostgreSQL DB  │               │
+│  └────────┬─────────┘ └────────┬────────┘ └────────┬───────┘               │
+│           │                    │                    │                        │
+│           ▼                    ▼                    ▼                        │
+│  ┌──────────────────┐ ┌─────────────────┐ ┌────────────────┐               │
+│  │ WEATHER          │ │ GEMINI AI       │ │    TABLES      │               │
+│  │ AGGREGATOR       │ │ ANALYZER        │ │                │               │
+│  │                  │ │                 │ │  • triggers    │               │
+│  │ Parallel Calls:  │ │ Analysis:       │ │  • risk_records│               │
+│  │ • OpenWeather    │ │ • Pattern match │ │  • weather_cache│              │
+│  │ • Metro Weather  │ │ • Risk score    │ │  • risk_alerts │               │
+│  │                  │ │ • Recommendations│ │  • user_settings│              │
+│  │ Cache 5 minutes  │ │ • Alert if high │ │                │               │
+│  │                  │ │                 │ │  RLS Enabled ✅ │               │
+│  └──────────────────┘ └────────┬────────┘ └────────────────┘               │
+│                                │                                             │
+│                                │ If risk_level = high/critical               │
+│                                ▼                                             │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ REALTIME PUB/SUB (WebSocket)                                          │  │
+│  │                                                                        │  │
+│  │  INSERT INTO risk_alerts                                              │  │
+│  │  ↓                                                                     │  │
+│  │  Broadcast to subscribed clients                                      │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                │                                             │
+└────────────────────────────────┼─────────────────────────────────────────────┘
+                                 │ WebSocket
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            CLIENT LAYER (React Native)                        │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ REALTIME SERVICE (client/sync/RealtimeService.ts)                     │  │
+│  │                                                                        │  │
+│  │  • Subscribes to risk_alerts channel                                  │  │
+│  │  • Receives alert via WebSocket                                       │  │
+│  │  • Sends push notification                                            │  │
+│  │  • Updates UI                                                          │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                │                                             │
+│                                ▼                                             │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │ PUSH NOTIFICATION                                                      │  │
+│  │                                                                        │  │
+│  │  🔔 HIGH Risk Alert!                                                   │  │
+│  │  Multiple triggers detected today. Check your dashboard.              │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          EXTERNAL SERVICES                                   │
+│                                                                              │
+│  ┌──────────────┐      ┌──────────────┐      ┌──────────────┐              │
+│  │ OpenWeather  │      │ Metro Weather│      │  Gemini AI   │              │
+│  │     API      │      │     API      │      │              │              │
+│  │              │      │              │      │              │              │
+│  │ • Weather    │      │ • AQI        │      │ • Pattern    │              │
+│  │ • Temperature│      │ • PM2.5      │      │   Analysis   │              │
+│  │ • Humidity   │      │ • Pollen     │      │ • Risk Score │              │
+│  └──────────────┘      └──────────────┘      └──────────────┘              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         KEY ARCHITECTURAL PATTERNS                            ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  1. OFFLINE-FIRST                                                            ║
+║     • Local SQLite storage before cloud                                     ║
+║     • App works without network                                             ║
+║     • Background sync when online                                           ║
+║                                                                              ║
+║  2. EVENT-DRIVEN                                                             ║
+║     • BLE triggers → Immediate storage → Background sync                    ║
+║     • Async processing (weather, AI analysis)                               ║
+║     • Real-time alerts via WebSocket                                        ║
+║                                                                              ║
+║  3. CACHING STRATEGY                                                         ║
+║     • Weather data: 5 minutes                                               ║
+║     • Dashboard stats: cached per user/period                               ║
+║     • Materialized views for complex queries                                ║
+║                                                                              ║
+║  4. RETRY & RESILIENCE                                                       ║
+║     • Exponential backoff for failed syncs                                  ║
+║     • Max 5 retry attempts                                                  ║
+║     • Network-aware syncing                                                 ║
+║                                                                              ║
+║  5. SECURITY                                                                 ║
+║     • Row Level Security (RLS)                                              ║
+║     • User data isolation                                                   ║
+║     • Authenticated Edge Functions                                          ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                           PERFORMANCE OPTIMIZATIONS                           ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  🚀 Database                                                                 ║
+║     • Indexed queries (user_id, timestamp)                                  ║
+║     • Materialized views (pre-computed stats)                               ║
+║     • Connection pooling                                                    ║
+║                                                                              ║
+║  🚀 API Calls                                                                ║
+║     • Parallel requests (OpenWeather + Metro)                               ║
+║     • Response caching (5 minutes)                                          ║
+║     • Batch uploads (10 at a time)                                          ║
+║                                                                              ║
+║  🚀 Mobile App                                                               ║
+║     • Local SQLite for instant access                                       ║
+║     • Background tasks for sync                                             ║
+║     • Efficient BLE scanning                                                ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+*/
