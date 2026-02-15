@@ -589,10 +589,28 @@ export default function ProfilePage() {
 
           {/* Inhaler Remaining Doses */}
           <View className="flex-row justify-between mt-4">
-            <View className="bg-white/20 rounded-2xl p-4 flex-1">
-              <Ionicons name="medkit" size={24} color="white" />
-              <Text className="text-white text-2xl font-bold mt-2">{remainingDoses}/30</Text>
-              <Text className="text-white/80 text-xs">Inhaler Doses Remaining</Text>
+            <View 
+              className="rounded-2xl p-4 flex-1"
+              style={{
+                backgroundColor: remainingDoses < 10 
+                  ? 'rgba(234, 88, 12, 0.4)'  // Orange warning
+                  : remainingDoses < 5 
+                  ? 'rgba(220, 38, 38, 0.4)'  // Red critical
+                  : 'rgba(255, 255, 255, 0.2)', // Normal
+              }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {remainingDoses < 10 && (
+                  <Ionicons name="warning" size={24} color="white" style={{ marginRight: 8 }} />
+                )}
+                <Ionicons name="medkit" size={24} color="white" />
+              </View>
+              <Text className="text-white text-2xl font-bold mt-2">
+                {remainingDoses}/30
+                {remainingDoses < 10 && ' ⚠️'}
+              </Text>
+              <Text className="text-white/80 text-xs">
+                {remainingDoses < 10 ? 'LOW - Please refill soon!' : 'Inhaler Doses Remaining'}
+              </Text>
             </View>
           </View>
         </LinearGradient>

@@ -132,6 +132,44 @@ BEFORE UPDATE ON public.asthma_action_plan
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ===============================
+-- Table: inhaler_count
+-- ===============================
+CREATE TABLE IF NOT EXISTS public.inhaler_count (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  remaining_doses INTEGER NOT NULL DEFAULT 30,
+  total_doses INTEGER NOT NULL DEFAULT 30,
+  last_reset_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_inhaler_count_user_id ON public.inhaler_count(user_id);
+
+-- RLS
+ALTER TABLE public.inhaler_count ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "Users can view own inhaler count"
+  ON public.inhaler_count FOR SELECT
+  USING (auth.uid() = user_id);
+CREATE POLICY IF NOT EXISTS "Users can insert own inhaler count"
+  ON public.inhaler_count FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+CREATE POLICY IF NOT EXISTS "Users can update own inhaler count"
+  ON public.inhaler_count FOR UPDATE
+  USING (auth.uid() = user_id);
+CREATE POLICY IF NOT EXISTS "Users can delete own inhaler count"
+  ON public.inhaler_count FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Trigger
+DROP TRIGGER IF EXISTS trg_inhaler_count_updated_at ON public.inhaler_count;
+CREATE TRIGGER trg_inhaler_count_updated_at
+BEFORE UPDATE ON public.inhaler_count
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ===============================
 -- Notes
 -- 1) Legacy gamification tables (user_challenges, challenge_progress_logs) are intentionally omitted.
 --    If they exist and are no longer needed, consider archiving then dropping them manually.

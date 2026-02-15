@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Modal, Linking, Platform } from 'react-native';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import MapView, { Marker, Circle, Callout } from 'react-native-maps';
@@ -15,7 +15,7 @@ import BluetoothManager from '@/components/BluetoothManager';
 import SOSButton, { sendAutoEmergencySMS } from '@/components/SOSButton';
 import TestPredictiveRiskAPIs from '@/components/TestPredictiveRiskAPIs';
 import PredictiveRiskAlert from '@/components/PredictiveRiskAlert';
-import { getRemainingDoses } from '@/utils/inhalerCounter';
+import { getRemainingDoses, resetDoses } from '@/utils/inhalerCounter';
 import { sendRedZoneAlert } from '@/utils/notificationService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, gradients } from '@/utils/theme';
@@ -70,7 +70,9 @@ export default function Dashboard() {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const lastRedZoneAlertRef = useRef<{ zoneId: string; timestamp: number } | null>(null);
   const hasAutoLocatedRef = useRef(false);
+  const locationUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const RED_ZONE_RADIUS_METERS = 500;
+  const MAX_MARKERS_TO_RENDER = 50; // Limit markers for performance
   const RED_ZONE_ALERT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
   const mapBottomPadding = 350 + insets.bottom;
   const floatingButtonOffset = 64 + insets.bottom;
@@ -119,11 +121,17 @@ export default function Dashboard() {
       subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 50,
-          timeInterval: 60 * 1000,
+          distanceInterval: 100, // Increased from 50 for less frequent updates
+          timeInterval: 120 * 1000, // Increased from 60s to 120s
         },
         (newLocation) => {
-          setLocation(newLocation);
+          // Debounce location updates to reduce re-renders
+          if (locationUpdateTimeoutRef.current) {
+            clearTimeout(locationUpdateTimeoutRef.current);
+          }
+          locationUpdateTimeoutRef.current = setTimeout(() => {
+            setLocation(newLocation);
+          }, 500);
         }
       );
     };
@@ -134,17 +142,71 @@ export default function Dashboard() {
       if (subscription) {
         subscription.remove();
       }
+      if (locationUpdateTimeoutRef.current) {
+        clearTimeout(locationUpdateTimeoutRef.current);
+      }
     };
   }, []);
 
+  // Memoize distance calculation function
+  const getDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  }, []);
+
+  // Memoize red zones calculation to avoid expensive recalculation
+  const calculatedRedZones = useMemo(() => {
+    const zones: RedZone[] = [];
+    const radius = 500;
+    const processed = new Set<number>();
+
+    triggers.forEach((trigger, index) => {
+      if (processed.has(index)) return;
+      
+      let nearbyCount = 1;
+      const nearbyTriggers = [trigger];
+
+      triggers.forEach((otherTrigger, otherIndex) => {
+        if (index !== otherIndex && !processed.has(otherIndex)) {
+          const distance = getDistance(
+            trigger.latitude,
+            trigger.longitude,
+            otherTrigger.latitude,
+            otherTrigger.longitude
+          );
+
+          if (distance <= radius) {
+            nearbyCount++;
+            nearbyTriggers.push(otherTrigger);
+            processed.add(otherIndex);
+          }
+        }
+      });
+
+      if (nearbyCount >= 5) {
+        const centerLat = nearbyTriggers.reduce((sum, t) => sum + t.latitude, 0) / nearbyTriggers.length;
+        const centerLon = nearbyTriggers.reduce((sum, t) => sum + t.longitude, 0) / nearbyTriggers.length;
+        zones.push({ latitude: centerLat, longitude: centerLon, count: nearbyCount });
+      }
+    });
+
+    return zones;
+  }, [triggers, getDistance]);
+
+  // Update redZones only when calculated zones change
   useEffect(() => {
-    calculateRedZones();
-    
-    return () => {
-      // Cleanup red zones calculation
-      setRedZones([]);
-    };
-  }, [triggers]);
+    setRedZones(calculatedRedZones);
+  }, [calculatedRedZones]);
 
   // Refresh remaining doses whenever the dashboard gains focus
   useFocusEffect(
@@ -169,15 +231,17 @@ export default function Dashboard() {
     }, [])
   );
 
-  // Load inhaler remaining doses on mount and when triggers list updates
-  useEffect(() => {
-    getRemainingDoses().then(setRemainingDoses).catch(() => {});
-  }, [triggers]);
+  // Removed: Loading doses on every trigger change causes unnecessary API calls
 
+  // Memoize proximity check to reduce calculations
   useEffect(() => {
-    if (location) {
+    if (!location || redZones.length === 0) return;
+    
+    const timeoutId = setTimeout(() => {
       checkRedZoneProximity(location);
-    }
+    }, 1000); // Debounce proximity check
+
+    return () => clearTimeout(timeoutId);
   }, [location, redZones]);
 
   const initializeLocation = async () => {
@@ -230,67 +294,7 @@ export default function Dashboard() {
     }
   };
 
-  const calculateRedZones = () => {
-    const zones: RedZone[] = [];
-    const radius = 500; // 500 meters
-
-    triggers.forEach((trigger, index) => {
-      let nearbyCount = 1;
-      const nearbyTriggers = [trigger];
-
-      triggers.forEach((otherTrigger, otherIndex) => {
-        if (index !== otherIndex) {
-          const distance = getDistance(
-            trigger.latitude,
-            trigger.longitude,
-            otherTrigger.latitude,
-            otherTrigger.longitude
-          );
-
-          if (distance <= radius) {
-            nearbyCount++;
-            nearbyTriggers.push(otherTrigger);
-          }
-        }
-      });
-
-      if (nearbyCount >= 5) {
-        const centerLat =
-          nearbyTriggers.reduce((sum, t) => sum + t.latitude, 0) / nearbyTriggers.length;
-        const centerLon =
-          nearbyTriggers.reduce((sum, t) => sum + t.longitude, 0) / nearbyTriggers.length;
-
-        const existingZone = zones.find(
-          (zone) => getDistance(zone.latitude, zone.longitude, centerLat, centerLon) <= radius
-        );
-
-        if (!existingZone) {
-          zones.push({
-            latitude: centerLat,
-            longitude: centerLon,
-            count: nearbyCount,
-          });
-        }
-      }
-    });
-
-    setRedZones(zones);
-  };
-
-  const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = (lat1 * Math.PI) / 180;
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c;
-  };
+  // Removed: Moved getDistance before useMemo
 
   const checkRedZoneProximity = (currentLocation: Location.LocationObject) => {
     if (!currentLocation || redZones.length === 0) return;
@@ -356,9 +360,14 @@ export default function Dashboard() {
       } else {
         Alert.alert('✅ Trigger Recorded', 'Inhaler use recorded. Sending emergency alert to contacts...');
         loadTriggers();
-        // Decrement inhaler dose counter
+        // Decrement inhaler dose counter and refresh UI
         const { decrementDose } = await import('@/utils/inhalerCounter').then(m => m);
         await decrementDose();
+        // Refresh remaining doses in UI
+        try {
+          const updatedDoses = await getRemainingDoses();
+          setRemainingDoses(updatedDoses);
+        } catch {}
         
         // Automatically send SOS to emergency contacts
         await sendAutoEmergencySMS();
@@ -370,7 +379,7 @@ export default function Dashboard() {
 
 
 
-  const handleMarkerPress = (trigger: InhalerTrigger) => {
+  const handleMarkerPress = useCallback((trigger: InhalerTrigger) => {
     // Navigate to detailed weather page
     router.push({
       pathname: '/trigger-details',
@@ -382,13 +391,13 @@ export default function Dashboard() {
         category: trigger.category,
       },
     });
-  };
+  }, []);
 
-  const handleInhalerConnect = () => {
+  const handleInhalerConnect = useCallback(() => {
     setBluetoothModalVisible(true);
-  };
+  }, []);
 
-  const centerOnLocation = () => {
+  const centerOnLocation = useCallback(() => {
     if (location && mapRef.current) {
       mapRef.current.animateToRegion({
         latitude: location.coords.latitude,
@@ -397,7 +406,7 @@ export default function Dashboard() {
         longitudeDelta: 0.001,
       });
     }
-  };
+  }, [location]);
 
   const fetchNearbyHospitals = async () => {
     if (!location) {
@@ -606,8 +615,8 @@ export default function Dashboard() {
             showsBuildings={true}
             showsTraffic={false}
             mapPadding={{ top: 0, right: 0, bottom: mapBottomPadding, left: 0 }}>
-            {/* Inhaler Trigger Markers */}
-            {triggers.map((trigger) => (
+            {/* Inhaler Trigger Markers - Limited for performance */}
+            {triggers.slice(0, MAX_MARKERS_TO_RENDER).map((trigger) => (
               <Marker
                 key={trigger.id}
                 coordinate={{
@@ -854,8 +863,7 @@ export default function Dashboard() {
               <View style={{ alignItems: 'center', marginBottom: 20 }}>
                 <View 
                   className="w-20 h-20 rounded-full items-center justify-center mb-4"
-                  style={{ backgroundColor: colors.accent2, elevation: 8 }}
-                  style={{ elevation: 8 }}>
+                  style={{ backgroundColor: colors.accent2, elevation: 8 }}>
                   <Text style={{ fontSize: 32, fontWeight: 'bold', color: 'white' }}>
                     H
                   </Text>
@@ -909,19 +917,48 @@ export default function Dashboard() {
         </Modal>
 
         {/* Inhaler Counter Badge */}
-        <View style={{ position: 'absolute', top: insets.top + 12, right: 12 }}>
+        <TouchableOpacity 
+          style={{ position: 'absolute', top: insets.top + 12, right: 12 }}
+          onPress={() => {
+            Alert.alert(
+              'Inhaler Counter',
+              `You have ${remainingDoses} doses remaining out of 30.${remainingDoses < 10 ? '\n\n⚠️ WARNING: Running low on doses!' : ''}`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Reset to 30',
+                  onPress: async () => {
+                    try {
+                      const newCount = await resetDoses(30);
+                      setRemainingDoses(newCount);
+                      Alert.alert('✅ Reset Complete', 'Inhaler counter has been reset to 30 doses.');
+                    } catch (error) {
+                      Alert.alert('Error', 'Failed to reset counter. Please try again.');
+                    }
+                  },
+                },
+              ]
+            );
+          }}>
           <View
             className="px-3 py-2 rounded-full shadow-md flex-row items-center"
             style={{
               elevation: 4,
-              backgroundColor: 'rgba(255, 255, 255, 0.12)',
-              borderColor: colors.glassBorder,
+              backgroundColor: remainingDoses < 10 
+                ? 'rgba(234, 88, 12, 0.9)'  // Orange warning color
+                : remainingDoses < 5 
+                ? 'rgba(220, 38, 38, 0.9)'  // Red critical color
+                : 'rgba(37, 99, 235, 0.9)', // Blue normal color
+              borderColor: 'rgba(255, 255, 255, 0.3)',
               borderWidth: 1,
             }}>
-            <Ionicons name="medkit" size={16} color={colors.accent2} />
-            <Text style={{ color: colors.text, fontWeight: '700', marginLeft: 8 }}>{remainingDoses}/30</Text>
+            {remainingDoses < 10 && (
+              <Ionicons name="warning" size={16} color="#fff" style={{ marginRight: 4 }} />
+            )}
+            <Ionicons name="medkit" size={16} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 8 }}>{remainingDoses}/30</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
     </GestureHandlerRootView>
   );

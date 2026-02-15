@@ -9,7 +9,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,
@@ -188,11 +187,16 @@ export const sendRedZoneAlert = async (triggerCount: number): Promise<void> => {
 
 export async function sendLowInhalerAlert(remaining: number) {
   try {
+    const isCritical = remaining <= 5;
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Inhaler Low – Replace Soon',
-        body: `Only ${remaining} dose${remaining === 1 ? '' : 's'} left out of 30. Please prepare a replacement.`,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
+        title: isCritical ? '🚨 Inhaler Critical – Replace Now' : '⚠️ Inhaler Running Low',
+        body: isCritical 
+          ? `Only ${remaining} dose${remaining === 1 ? '' : 's'} left! Please replace your inhaler immediately.`
+          : `${remaining} doses remaining out of 30. Consider getting a replacement soon.`,
+        priority: isCritical 
+          ? Notifications.AndroidNotificationPriority.MAX 
+          : Notifications.AndroidNotificationPriority.HIGH,
         sound: 'default',
       },
       trigger: null,

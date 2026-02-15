@@ -37,7 +37,9 @@
           "bluetoothAlwaysUsageDescription": "QAir needs Bluetooth to connect to your smart inhaler and IoT health monitoring devices.",
           "bluetoothPeripheralUsageDescription": "QAir uses Bluetooth to communicate with your health devices and track asthma triggers."
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

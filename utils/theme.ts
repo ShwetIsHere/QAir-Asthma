@@ -13,7 +13,7 @@ export const colors = {
 };
 
 export const gradients = {
-  screen: ['#0B1020', '#121B2E', '#1A2A3D'],
-  accent: ['#35C1A1', '#4DA3FF'],
-  header: ['#102036', '#1B344A'],
+  screen: ['#0B1020', '#121B2E', '#1A2A3D'] as const,
+  accent: ['#35C1A1', '#4DA3FF'] as const,
+  header: ['#102036', '#1B344A'] as const,
 };
