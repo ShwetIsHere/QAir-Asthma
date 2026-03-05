@@ -38,7 +38,6 @@
           "bluetoothPeripheralUsageDescription": "QAir uses Bluetooth to communicate with your health devices and track asthma triggers."
         }
       ],
-      "expo-sqlite",
       "expo-font"
     ],
     "experiments": {
