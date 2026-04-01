@@ -66,11 +66,16 @@ export default function Dashboard() {
   const [riskMonitorModalVisible, setRiskMonitorModalVisible] = useState(false);
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [directionModalVisible, setDirectionModalVisible] = useState(false);
+  const [isTriggerDisabled, setIsTriggerDisabled] = useState(false);
   const mapRef = useRef<MapView>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
   const lastRedZoneAlertRef = useRef<{ zoneId: string; timestamp: number } | null>(null);
   const hasAutoLocatedRef = useRef(false);
   const locationUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRecordingTriggerRef = useRef(false);
+  const lastTriggerTimeRef = useRef<number>(0);
+  const triggerCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const TRIGGER_DEBOUNCE_MS = 10000; // 10-second cooldown to deduplicate panic taps
   const RED_ZONE_RADIUS_METERS = 500;
   const MAX_MARKERS_TO_RENDER = 50; // Limit markers for performance
   const RED_ZONE_ALERT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
@@ -323,9 +328,25 @@ export default function Dashboard() {
   };
 
   const handleAddTrigger = async () => {
+    // Deduplicate rapid/panic taps — only allow one trigger per TRIGGER_DEBOUNCE_MS window
+    const now = Date.now();
+    if (isRecordingTriggerRef.current || now - lastTriggerTimeRef.current < TRIGGER_DEBOUNCE_MS) {
+      return;
+    }
+
     if (!location) {
       Alert.alert('Error', 'Location not available');
       return;
+    }
+
+    // Lock: mark as recording and start cooldown
+    isRecordingTriggerRef.current = true;
+    lastTriggerTimeRef.current = now;
+    setIsTriggerDisabled(true);
+
+    // Clear any existing cooldown timer
+    if (triggerCooldownTimerRef.current) {
+      clearTimeout(triggerCooldownTimerRef.current);
     }
 
     try {
@@ -374,6 +395,14 @@ export default function Dashboard() {
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to record trigger');
+    } finally {
+      // Release the async lock; keep button disabled until the full cooldown elapses
+      isRecordingTriggerRef.current = false;
+      const elapsed = Date.now() - lastTriggerTimeRef.current;
+      const remaining = Math.max(0, TRIGGER_DEBOUNCE_MS - elapsed);
+      triggerCooldownTimerRef.current = setTimeout(() => {
+        setIsTriggerDisabled(false);
+      }, remaining);
     }
   };
 
@@ -736,11 +765,16 @@ export default function Dashboard() {
         <View className="absolute self-center" style={{ bottom: triggerButtonOffset }}>
           <TouchableOpacity
             onPress={handleAddTrigger}
+            disabled={isTriggerDisabled}
             className="rounded-full flex-row items-center shadow-2xl overflow-hidden"
-            style={{ elevation: 10 }}>
+            style={{ elevation: 10, opacity: isTriggerDisabled ? 0.55 : 1 }}>
             <LinearGradient colors={gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingVertical: 16, paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="add-circle" size={28} color="white" />
-              <Text style={{ color: 'white', fontWeight: '700', fontSize: 16, marginLeft: 10 }}>Record Trigger</Text>
+              {isTriggerDisabled
+                ? <ActivityIndicator size={24} color="white" />
+                : <Ionicons name="add-circle" size={28} color="white" />}
+              <Text style={{ color: 'white', fontWeight: '700', fontSize: 16, marginLeft: 10 }}>
+                {isTriggerDisabled ? 'Recorded...' : 'Record Trigger'}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
