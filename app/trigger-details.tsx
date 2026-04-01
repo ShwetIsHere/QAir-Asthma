@@ -157,7 +157,7 @@ export default function TriggerDetails() {
       
       // Add helpful tips based on error type
       if (errorDetails.includes('API key')) {
-        errorDetails += '\n\nPlease check that EXPO_PUBLIC_OPENROUTER_API_KEY is set in your environment variables.';
+        errorDetails += '\n\nPlease check EXPO_PUBLIC_GEMINI_API_KEY (primary) and EXPO_PUBLIC_BACKUP_API_KEY (backup) in your environment variables.';
       } else if (errorDetails.includes('internet') || errorDetails.includes('Network')) {
         errorDetails += '\n\nPlease check your internet connection and try again.';
       } else if (errorDetails.includes('credits') || errorDetails.includes('402')) {

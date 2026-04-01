@@ -15,7 +15,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const geminiApiKey = Deno.env.get('GEMINI_API_KEY')!;
+const geminiApiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('BACKUP_API_KEY') || Deno.env.get('backup_api_key');
+
+if (!geminiApiKey) {
+  throw new Error('Missing Gemini API key. Set GEMINI_API_KEY or BACKUP_API_KEY.');
+}
 
 interface RiskAnalysisRequest {
   trigger_id: number;

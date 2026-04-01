@@ -1,6 +1,16 @@
 import axios from 'axios';
 
-const GEMINI_API_KEY = 'AIzaSyBAZOApw2YeqAAGW9GAqr6tlT6M-TeWuDk';
+const getGeminiApiKeys = (): string[] => {
+  const keys = [
+    process.env.EXPO_PUBLIC_GEMINI_API_KEY,
+    process.env.EXPO_PUBLIC_BACKUP_API_KEY,
+    process.env.backup_api_key,
+    process.env.EXPO_PUBLIC_OPENROUTER_API_KEY,
+  ].filter((key): key is string => Boolean(key));
+
+  // Keep order while removing duplicates.
+  return [...new Set(keys)];
+};
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const GEMINI_MODEL = 'models/gemini-flash-lite-latest';
 
@@ -53,13 +63,16 @@ export const chatCompletion = async (
   model: string = GEMINI_MODEL,
   retries: number = 2
 ): Promise<string> => {
+  const apiKeys = getGeminiApiKeys();
+  const totalAttempts = Math.max(retries + 1, apiKeys.length || 0);
   let lastError: any;
   
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  for (let attempt = 0; attempt < totalAttempts; attempt++) {
     try {
-      if (!GEMINI_API_KEY) {
+      const activeApiKey = apiKeys[Math.min(attempt, apiKeys.length - 1)];
+      if (!activeApiKey) {
         console.error('Gemini API key is missing!');
-        throw new Error('Gemini API key not configured.');
+        throw new Error('Gemini API key not configured. Set EXPO_PUBLIC_GEMINI_API_KEY and optionally EXPO_PUBLIC_BACKUP_API_KEY.');
       }
 
       if (attempt > 0) {
@@ -93,7 +106,7 @@ export const chatCompletion = async (
       });
 
       const response = await axios.post<GeminiResponse>(
-        `${GEMINI_BASE_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        `${GEMINI_BASE_URL}/${model}:generateContent?key=${activeApiKey}`,
         {
           contents: [{
             parts: [{
@@ -129,17 +142,25 @@ export const chatCompletion = async (
       return content;
     } catch (error: any) {
       lastError = error;
-      console.error(`Gemini API error (attempt ${attempt + 1}/${retries + 1}):`, error?.message);
+      console.error(`Gemini API error (attempt ${attempt + 1}/${totalAttempts}):`, error?.message);
       
       // Don't retry on these errors
       const status = error?.response?.status;
-      if (status === 401 || status === 403 || status === 400) {
-        break; // Don't retry authentication or bad request errors
+      if (status === 400) {
+        break; // Don't retry bad request errors
+      }
+
+      if (status === 401 || status === 403) {
+        if (attempt + 1 < apiKeys.length) {
+          console.warn('Primary API key failed, switching to backup key...');
+          continue;
+        }
+        break;
       }
       
       // Only retry on 429 (rate limit) or network errors
       if (status === 429 || error?.code === 'ECONNABORTED' || error?.message?.includes('Network')) {
-        if (attempt < retries) {
+        if (attempt + 1 < totalAttempts) {
           continue; // Try again
         }
       } else {
