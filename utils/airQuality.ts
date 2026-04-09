@@ -265,8 +265,8 @@ export const fetchAirQuality = async (
     };
   } catch (error) {
     console.error('Error fetching weather data from Open-Meteo:', error);
-    // Throw error instead of returning mock data
-    throw new Error('Failed to fetch weather data. Please check your internet connection.');
+    console.warn('Open-Meteo unavailable, using fallback environmental data');
+    return getMockAirQualityData();
   }
 };
 

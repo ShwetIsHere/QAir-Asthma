@@ -14,8 +14,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const openWeatherApiKey = Deno.env.get('OPENWEATHER_API_KEY')!;
-const metroWeatherApiKey = Deno.env.get('METRO_WEATHER_API_KEY')!;
 
 interface WeatherRequest {
   trigger_id: number;
@@ -103,14 +101,14 @@ serve(async (req: Request) => {
     // Fetch from APIs in parallel
     console.log('[WeatherAggregator] Fetching fresh weather data...');
 
-    const [openWeatherResponse, metroWeatherResponse] = await Promise.allSettled([
-      // OpenWeather API
+    const [weatherResponse, airQualityResponse] = await Promise.allSettled([
+      // Open-Meteo weather API
       fetch(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${openWeatherApiKey}&units=metric`
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weathercode,cloudcover,pressure_msl,visibility,wind_speed_10m&daily=uv_index_max&timezone=auto`
       ),
-      // Metro Weather API (for AQI and pollen)
+      // Open-Meteo air quality API
       fetch(
-        `https://api.metroweather.com/v1/air-quality?lat=${latitude}&lon=${longitude}&key=${metroWeatherApiKey}`
+        `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=pm10,pm2_5,us_aqi&timezone=auto`
       ),
     ]);
 
@@ -118,28 +116,61 @@ serve(async (req: Request) => {
       cached: false,
     };
 
-    // Process OpenWeather response
-    if (openWeatherResponse.status === 'fulfilled') {
-      const owData = await openWeatherResponse.value.json();
+    // Process Open-Meteo weather response
+    if (weatherResponse.status === 'fulfilled') {
+      const weatherApiData = await weatherResponse.value.json();
+      const weatherCode = weatherApiData?.current?.weathercode;
+
+      const weatherConditionMap: Record<number, string> = {
+        0: 'Clear',
+        1: 'Mainly Clear',
+        2: 'Partly Cloudy',
+        3: 'Overcast',
+        45: 'Fog',
+        48: 'Fog',
+        51: 'Drizzle',
+        53: 'Drizzle',
+        55: 'Drizzle',
+        56: 'Freezing Drizzle',
+        57: 'Freezing Drizzle',
+        61: 'Rain',
+        63: 'Rain',
+        65: 'Heavy Rain',
+        66: 'Freezing Rain',
+        67: 'Freezing Rain',
+        71: 'Snow',
+        73: 'Snow',
+        75: 'Heavy Snow',
+        77: 'Snow Grains',
+        80: 'Rain Showers',
+        81: 'Rain Showers',
+        82: 'Heavy Rain Showers',
+        85: 'Snow Showers',
+        86: 'Snow Showers',
+        95: 'Thunderstorm',
+        96: 'Thunderstorm',
+        99: 'Thunderstorm',
+      };
+
       weatherData = {
         ...weatherData,
-        temperature: owData.main.temp,
-        humidity: owData.main.humidity,
-        pressure: owData.main.pressure,
-        weather_condition: owData.weather[0].main,
-        source: 'OpenWeather',
+        temperature: weatherApiData?.current?.temperature_2m,
+        humidity: weatherApiData?.current?.relative_humidity_2m,
+        pressure: weatherApiData?.current?.pressure_msl,
+        weather_condition: weatherConditionMap[weatherCode] ?? 'Unknown',
+        source: 'Open-Meteo',
       };
     }
 
-    // Process Metro Weather response
-    if (metroWeatherResponse.status === 'fulfilled') {
-      const mwData = await metroWeatherResponse.value.json();
+    // Process Open-Meteo air quality response
+    if (airQualityResponse.status === 'fulfilled') {
+      const airQualityData = await airQualityResponse.value.json();
       weatherData = {
         ...weatherData,
-        aqi: mwData.aqi,
-        pm25: mwData.pm25,
-        pm10: mwData.pm10,
-        pollen_level: mwData.pollen_level,
+        aqi: airQualityData?.current?.us_aqi,
+        pm25: airQualityData?.current?.pm2_5,
+        pm10: airQualityData?.current?.pm10,
+        pollen_level: null,
       };
     }
 
