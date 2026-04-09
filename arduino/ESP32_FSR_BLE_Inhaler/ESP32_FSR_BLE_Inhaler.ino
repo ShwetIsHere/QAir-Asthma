@@ -9,7 +9,7 @@
 #include <BLE2902.h>
 
 // Configuration
-const int fsrPin = 34;
+const int fsrPin = 36;
 const int threshold = 500;
 const unsigned long debounceDelay = 3000;
 
