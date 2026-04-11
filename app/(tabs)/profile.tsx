@@ -408,8 +408,6 @@ export default function ProfilePage() {
         const dateRange = `${firstDate.toLocaleDateString()} - ${lastDate.toLocaleDateString()}`;
 
         const displayName = userName || user.user_metadata?.full_name || 'QAir User';
-        const openRouterApiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
-
         await generateHealthReport({
           userName: displayName,
           userEmail: user.email || 'Not provided',
@@ -417,7 +415,7 @@ export default function ProfilePage() {
           totalTriggers: triggers.length,
           avgAqi,
           dateRange,
-        }, openRouterApiKey);
+        });
 
         Alert.alert('Success', 'Your comprehensive PDF report is ready to share.');
       

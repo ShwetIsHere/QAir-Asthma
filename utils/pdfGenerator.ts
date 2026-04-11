@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Alert, Platform } from 'react-native';
 
 type TriggerData = {
@@ -173,12 +174,22 @@ const generateTriggerTableSection = (triggers: TriggerData[]) => {
   `;
 };
 
-const generateAIInsights = async (reportData: ReportData, openRouterApiKey: string): Promise<string> => {
-  try {
-    const riskyLocations = analyzeRiskyLocations(reportData.triggers);
-    const aqiDistribution = analyzeAQIDistribution(reportData.triggers);
-    
-    const prompt = `You are a health advisor analyzing asthma trigger data. Generate a comprehensive health report based on the following data:
+const getReportGroqApiKeys = (): string[] => {
+  const keys = [
+    process.env.EXPO_PUBLIC_REPORT_GROQ_KEY_1,
+    process.env.EXPO_PUBLIC_REPORT_GROQ_KEY_2,
+  ].filter((key): key is string => Boolean(key));
+
+  return [...new Set(keys)];
+};
+
+const GROQ_CHAT_COMPLETIONS_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const REPORT_GROQ_MODEL = 'llama-3.1-8b-instant';
+
+const generateAIInsights = async (reportData: ReportData): Promise<string> => {
+  const riskyLocations = analyzeRiskyLocations(reportData.triggers);
+  const aqiDistribution = analyzeAQIDistribution(reportData.triggers);
+  const prompt = `You are a health advisor analyzing asthma trigger data. Generate a comprehensive health report based on the following data:
 
 Total Triggers: ${reportData.totalTriggers}
 Average AQI: ${reportData.avgAqi}
@@ -202,31 +213,67 @@ Generate a professional medical report with these sections:
 
 Keep it professional, concise, and focused on actionable health advice for asthma patients.`;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openRouterApiKey}`,
-        'HTTP-Referer': 'https://qairapp.com',
-        'X-Title': 'QAir Health Report',
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      }),
-    });
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || 'Unable to generate AI insights at this time.';
-  } catch (error) {
-    console.error('AI insights error:', error);
-    return 'Unable to generate AI insights. Please try again later.';
+  const apiKeys = getReportGroqApiKeys();
+  if (apiKeys.length === 0) {
+    throw new Error('REPORT_GROQ_KEYS_NOT_CONFIGURED');
   }
+
+  let lastError: any = null;
+
+  for (const apiKey of apiKeys) {
+    try {
+      const response = await fetch(GROQ_CHAT_COMPLETIONS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: REPORT_GROQ_MODEL,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are a health advisor creating concise, professional asthma report insights.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          temperature: 0.6,
+          max_tokens: 500,
+        }),
+      });
+
+      if (!response.ok) {
+        const status = response.status;
+        const bodyText = await response.text().catch(() => '');
+        lastError = new Error(`Groq response ${status} ${bodyText}`);
+
+        // Try next key for auth/rate/temporary failures.
+        if (status === 401 || status === 403 || status === 429 || status >= 500) {
+          continue;
+        }
+
+        continue;
+      }
+
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (content && String(content).trim().length > 0) {
+        return String(content).trim();
+      }
+
+      lastError = new Error('Groq empty response');
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+  }
+
+  console.error('Report AI insights failed for all keys:', lastError);
+  throw new Error('REPORT_AI_TEMPORARY_UNAVAILABLE');
 };
 
 const generateBarChart = (data: { [key: string]: number }) => {
@@ -302,14 +349,24 @@ const generatePieChart = (distribution: any) => {
   `;
 };
 
-export const generateHealthReport = async (reportData: ReportData, openRouterApiKey: string) => {
+export const generateHealthReport = async (reportData: ReportData) => {
   try {
     const riskyLocations = analyzeRiskyLocations(reportData.triggers);
     const weeklyData = analyzeWeeklyData(reportData.triggers);
     const aqiDistribution = analyzeAQIDistribution(reportData.triggers);
     
-    // Generate AI insights
-    const aiInsights = await generateAIInsights(reportData, openRouterApiKey);
+    // Generate AI insights with report-only Groq fallback keys.
+    let aiInsights = '';
+    try {
+      aiInsights = await generateAIInsights(reportData);
+    } catch (error: any) {
+      if (error?.message === 'REPORT_GROQ_KEYS_NOT_CONFIGURED') {
+        Alert.alert('AI setup needed', 'Report AI keys are missing. Please configure EXPO_PUBLIC_REPORT_GROQ_KEY_1 and EXPO_PUBLIC_REPORT_GROQ_KEY_2.');
+      } else {
+        Alert.alert('Please wait', 'AI report is busy right now. Please come again after 2 minutes.');
+      }
+      aiInsights = 'AI analysis is temporarily unavailable. Please try generating the report again after 2 minutes.';
+    }
     
     // Use QAir branding without external logo
     const logoBase64 = '';
@@ -685,35 +742,48 @@ export const generateHealthReport = async (reportData: ReportData, openRouterApi
     </html>
     `;
 
-    // Create custom filename: username-dd-mm-yy-Report.pdf
+    // Create deterministic filename: yyyy-mm-dd-username.pdf
     const date = new Date();
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
-    const sanitizedUsername = reportData.userName.replace(/[^a-zA-Z0-9]/g, '_');
-    const customFilename = `${sanitizedUsername}-${day}-${month}-${year}-Report.pdf`;
+    const year = String(date.getFullYear());
+    const sanitizedUsername = (reportData.userName || 'user').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    const customFilename = `${year}-${month}-${day}+${sanitizedUsername}.pdf`;
     
     // Generate PDF with custom filename
     const { uri } = await Print.printToFileAsync({ 
       html,
       base64: false,
     });
+
+    const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+    if (!targetDir) {
+      throw new Error('No writable directory available for PDF export.');
+    }
+
+    const namedUri = `${targetDir}${customFilename}`;
+    const existing = await FileSystem.getInfoAsync(namedUri);
+    if (existing.exists) {
+      await FileSystem.deleteAsync(namedUri, { idempotent: true });
+    }
+
+    await FileSystem.moveAsync({ from: uri, to: namedUri });
     
-    console.log('PDF generated at:', uri);
+    console.log('PDF generated at:', namedUri);
     
     // Share the PDF
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
-      await Sharing.shareAsync(uri, {
+      await Sharing.shareAsync(namedUri, {
         mimeType: 'application/pdf',
         dialogTitle: 'Share Your Health Report',
         UTI: 'com.adobe.pdf',
       });
     } else {
-      Alert.alert('Success', `PDF saved to: ${uri}`);
+      Alert.alert('Success', `PDF saved to: ${namedUri}`);
     }
     
-    return uri;
+    return namedUri;
   } catch (error: any) {
     console.error('PDF generation error:', error);
     
