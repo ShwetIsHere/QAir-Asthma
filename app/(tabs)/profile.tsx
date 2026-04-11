@@ -19,7 +19,6 @@ import { getRemainingDoses, resetDoses } from '@/utils/inhalerCounter';
 import { supabase } from '@/utils/supabase';
 import BluetoothManager from '@/components/BluetoothManager';
 import EmergencyContactsManager from '@/components/EmergencyContactsManager';
-import AsthmaActionPlanManager from '@/components/AsthmaActionPlanManager';
 import { generateHealthReport } from '@/utils/pdfGenerator';
 import { colors, gradients } from '@/utils/theme';
 
@@ -926,18 +925,13 @@ export default function ProfilePage() {
             <Text className="text-red-900 font-bold text-2xl ml-3">Emergency Setup</Text>
           </View>
           <Text className="text-red-700 text-sm">
-            Configure emergency contacts and action plan for the SOS button
+            Configure emergency contacts for the SOS button
           </Text>
         </View>
 
         {/* Emergency Contacts Manager */}
         <View className="mx-5 mt-5">
           <EmergencyContactsManager />
-        </View>
-
-        {/* Asthma Action Plan Manager */}
-        <View className="mx-5 mt-5">
-          <AsthmaActionPlanManager />
         </View>
 
         {/* Export Report Button */}
