@@ -13,7 +13,6 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { fetchAirQuality } from '@/utils/airQuality';
 import BluetoothManager from '@/components/BluetoothManager';
 import SOSButton, { sendAutoEmergencySMS } from '@/components/SOSButton';
-import TestPredictiveRiskAPIs from '@/components/TestPredictiveRiskAPIs';
 import PredictiveRiskAlert from '@/components/PredictiveRiskAlert';
 import { getRemainingDoses, resetDoses } from '@/utils/inhalerCounter';
 import { sendRedZoneAlert } from '@/utils/notificationService';
@@ -62,7 +61,6 @@ export default function Dashboard() {
   const [showingHospitals, setShowingHospitals] = useState(false);
   const [loadingHospitals, setLoadingHospitals] = useState(false);
   const [remainingDoses, setRemainingDoses] = useState<number>(30);
-  const [testApisModalVisible, setTestApisModalVisible] = useState(false);
   const [riskMonitorModalVisible, setRiskMonitorModalVisible] = useState(false);
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [directionModalVisible, setDirectionModalVisible] = useState(false);
@@ -731,19 +729,6 @@ export default function Dashboard() {
             )}
           </TouchableOpacity>
           
-          {/* API Test Button */}
-          <TouchableOpacity
-            onPress={() => setTestApisModalVisible(true)}
-            className="w-16 h-16 rounded-full items-center justify-center shadow-2xl"
-            style={{ 
-              backgroundColor: '#60A5FA', 
-              elevation: 8,
-              borderColor: 'rgba(255, 255, 255, 0.2)',
-              borderWidth: 1,
-            }}>
-            <Ionicons name="flask" size={32} color="white" />
-          </TouchableOpacity>
-          
           {/* Risk Monitor Button */}
           <TouchableOpacity
             onPress={() => setRiskMonitorModalVisible(true)}
@@ -847,24 +832,6 @@ export default function Dashboard() {
                 }}
               />
             </View>
-          </View>
-        </Modal>
-
-        {/* API Test Modal */}
-        <Modal
-          visible={testApisModalVisible}
-          animationType="slide"
-          onRequestClose={() => setTestApisModalVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: colors.bg }}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>API Test Suite</Text>
-              <TouchableOpacity
-                onPress={() => setTestApisModalVisible(false)}
-                style={styles.closeButton}>
-                <Ionicons name="close-circle" size={32} color={colors.accent2} />
-              </TouchableOpacity>
-            </View>
-            <TestPredictiveRiskAPIs />
           </View>
         </Modal>
 

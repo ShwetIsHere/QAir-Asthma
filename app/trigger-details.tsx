@@ -47,6 +47,7 @@ export default function TriggerDetails() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hourlyForecast, setHourlyForecast] = useState<any[]>([]);
+  const [analysisAttempted, setAnalysisAttempted] = useState(false);
 
   const latitude = parseFloat(params.latitude as string);
   const longitude = parseFloat(params.longitude as string);
@@ -73,19 +74,6 @@ export default function TriggerDetails() {
       setError(null);
     };
   }, []);
-
-  useEffect(() => {
-    // Load AI analysis after weather data is available
-    let isMounted = true;
-    
-    if (weatherData && isMounted) {
-      loadAIAnalysis();
-    }
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [weatherData]);
 
   const loadPlaceName = async () => {
     try {
@@ -128,6 +116,7 @@ export default function TriggerDetails() {
   const loadAIAnalysis = async () => {
     if (!weatherData) return;
     
+    setAnalysisAttempted(true);
     setAnalysisLoading(true);
     setAiAnalysis(''); // Clear previous analysis
     
@@ -150,26 +139,9 @@ export default function TriggerDetails() {
       setAiAnalysis(analysis);
     } catch (error: any) {
       console.error('Error loading AI analysis:', error);
-      
-      // Show detailed error to user
-      let errorMessage = 'AI Analysis Unavailable';
-      let errorDetails = error?.message || 'Failed to get AI health assessment.';
-      
-      // Add helpful tips based on error type
-      if (errorDetails.includes('API key')) {
-        errorDetails += '\n\nPlease check EXPO_PUBLIC_GEMINI_API_KEY (primary) and EXPO_PUBLIC_BACKUP_API_KEY (backup) in your environment variables.';
-      } else if (errorDetails.includes('internet') || errorDetails.includes('Network')) {
-        errorDetails += '\n\nPlease check your internet connection and try again.';
-      } else if (errorDetails.includes('credits') || errorDetails.includes('402')) {
-        errorDetails += '\n\nThe free tier may have usage limits. Please try again later.';
-      }
-      
-      Alert.alert(
-        errorMessage,
-        errorDetails,
-        [{ text: 'OK' }]
-      );
-      setAiAnalysis(''); // Don't show any preloaded text
+      // Keep UX calm: avoid technical errors and guide user to retry.
+      Alert.alert('Please wait', 'Please wait for a few seconds and tap Suggestions again.');
+      setAiAnalysis('');
     } finally {
       setAnalysisLoading(false);
     }
@@ -355,7 +327,20 @@ export default function TriggerDetails() {
             </View>
           </View>
 
-          {/* AI-Powered Location Analysis - ONLY REAL AI, NO PRELOADED TEXT */}
+          <TouchableOpacity
+            onPress={loadAIAnalysis}
+            disabled={analysisLoading}
+            className="rounded-2xl px-4 py-3 mb-4"
+            style={{
+              backgroundColor: analysisLoading ? 'rgba(53, 193, 161, 0.35)' : 'rgba(53, 193, 161, 0.85)',
+              alignItems: 'center',
+            }}>
+            <Text className="text-white font-bold text-sm">
+              {analysisLoading ? 'Generating Suggestions...' : 'Suggestions'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* AI-Powered Location Analysis - Manual trigger via Suggestions button */}
           {analysisLoading ? (
             <View className="rounded-2xl p-4 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderColor: colors.glassBorder }}>
               <View className="flex-row items-center mb-2">
@@ -363,7 +348,7 @@ export default function TriggerDetails() {
                 <Text className="text-slate-100 font-semibold ml-2 text-sm">Analyzing with AI...</Text>
               </View>
               <Text className="text-slate-300 text-xs">
-                Fetching real-time health assessment from OpenRouter AI based on current weather data...
+                Fetching real-time health assessment from Gemini based on current weather data...
               </Text>
             </View>
           ) : aiAnalysis ? (
@@ -374,6 +359,12 @@ export default function TriggerDetails() {
               </View>
               <Text className="text-slate-100 text-sm leading-5">
                 {aiAnalysis}
+              </Text>
+            </View>
+          ) : analysisAttempted ? (
+            <View className="rounded-2xl p-4 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', borderColor: colors.glassBorder }}>
+              <Text className="text-slate-300 text-sm leading-5">
+                Unable to generate suggestions right now. Please wait for a few seconds and tap Suggestions again.
               </Text>
             </View>
           ) : null}

@@ -5,7 +5,6 @@ const getGeminiApiKeys = (): string[] => {
     process.env.EXPO_PUBLIC_GEMINI_API_KEY,
     process.env.EXPO_PUBLIC_BACKUP_API_KEY,
     process.env.backup_api_key,
-    process.env.EXPO_PUBLIC_OPENROUTER_API_KEY,
   ].filter((key): key is string => Boolean(key));
 
   // Keep order while removing duplicates.
@@ -71,8 +70,7 @@ export const chatCompletion = async (
     try {
       const activeApiKey = apiKeys[Math.min(attempt, apiKeys.length - 1)];
       if (!activeApiKey) {
-        console.error('Gemini API key is missing!');
-        throw new Error('Gemini API key not configured. Set EXPO_PUBLIC_GEMINI_API_KEY and optionally EXPO_PUBLIC_BACKUP_API_KEY.');
+        throw new Error('No Gemini API keys configured.');
       }
 
       if (attempt > 0) {
